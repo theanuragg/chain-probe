@@ -1,0 +1,42 @@
+[package]
+name = "chainprobe-backend"
+version = "4.0.0"
+edition = "2021"
+
+[lib]
+name = "chainprobe_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "chainprobe"
+path = "src/main.rs"
+
+[[bin]]
+name = "chainprobe-cli"
+path = "src/bin/chainprobe_cli.rs"
+
+[dependencies]
+axum         = { version = "0.7", features = ["multipart"] }
+tokio        = { version = "1",   features = ["full"] }
+tower        = "0.4"
+tower-http   = { version = "0.5", features = ["cors", "trace"] }
+serde        = { version = "1",   features = ["derive"] }
+serde_json   = "1"
+syn          = { version = "2",   features = ["full", "extra-traits", "visit", "parsing"] }
+proc-macro2  = "1"
+quote        = "1"
+regex        = "1"
+reqwest      = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+uuid         = { version = "1",   features = ["v4"] }
+chrono       = { version = "0.4", features = ["serde"] }
+tracing      = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow       = "1"
+thiserror    = "1"
+dotenvy      = "0.15"
+clap         = { version = "4",   features = ["derive"] }
+printpdf    = "0.7"
+
+[profile.release]
+opt-level = 3
+overflow-checks = true

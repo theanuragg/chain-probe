@@ -1,0 +1,86 @@
+# ChainProbe Security Audit GitHub Action
+# Run on every PR and push to main
+
+name: Security Audit
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * *'  # Daily scan
+
+jobs:
+  chainprobe-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build ChainProbe
+        run: cd backend && cargo build --release
+
+      - name: Run security audit
+        id: audit
+        run: |
+          SCORE=$(./target/release/chainprobe --json | jq -r '.summary.security_score')
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+          echo "critical=$(./target/release/chainprobe --json | jq -r '.summary.critical_count')" >> $GITHUB_OUTPUT
+          echo "chains=$(./target/release/chainprobe --json | jq -r '.summary.chain_count')" >> $GITHUB_OUTPUT
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const score = ${{ steps.audit.outputs.score }};
+            const critical = ${{ steps.audit.outputs.critical }};
+            const chains = ${{ steps.audit.outputs.chains }};
+            
+            const emoji = score >= 80 ? '🟢' : score >= 60 ? '🟡' : score >= 40 ? '🟠' : '🔴';
+            const status = score >= 60 ? 'PASSED' : score >= 40 ? 'WARNING' : 'FAILED';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🔒 ChainProbe Security Audit
+              
+              **Score:** ${score}/100 ${emoji}
+              **Status:** ${status}
+              **Critical:** ${critical} | **Chains:** ${chains}
+              
+              ${critical > 0 ? '⚠️ Critical vulnerabilities found!' : 'No critical vulnerabilities.'}
+              ${chains > 0 ? '⚠️ Exploitable vulnerability chains detected!' : ''}
+              `
+            });
+
+      - name: Fail on critical issues
+        if: github.event_name == 'pull_request' && steps.audit.outputs.critical > 0
+        run: |
+          echo "::error::Critical security issues found - failing build"
+          exit 1
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: chainprobe-report.json
+
+#
+# chainprobe-docker:
+#   runs-on: ubuntu-latest
+#   steps:
+#     - uses: actions/checkout@v4
+#     - name: Run ChainProbe container
+#       run: |
+#         docker run -v ${{ github.workspace }}:/code \
+#           chainprobe/chainprobe:latest /code --json > report.json
+#     - uses: actions/upload-artifact@v4
+#       with:
+#         name: report
+#         path: report.json
