@@ -1,6 +1,6 @@
 // backend/src/main.rs — ChainProbe v4
 
-use axum::{Router, routing::{get, post}, http::Method};
+use axum::{Router, routing::{get, post}, http::Method, extract::DefaultBodyLimit};
 use tower_http::cors::{CorsLayer, Any};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use std::net::SocketAddr;
@@ -54,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/analyze", post(routes::analyze))
         .route("/api/diff",    post(routes::diff_reports))
         .route("/api/export/:id", get(routes::export_report))
+        .layer(DefaultBodyLimit::max(25_000_000))  // 25MB limit
         .layer(cors)
         .layer(tower_http::trace::TraceLayer::new_for_http());
 

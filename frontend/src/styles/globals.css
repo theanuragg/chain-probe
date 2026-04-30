@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg: #F8F9FB;
+  --bg2: #FFFFFF;
+  --surf: #FFFFFF;
+  --txt: #131313;
+  --t2: #4B5563;
+  --t3: #999999;
+  --bdr: rgba(0,0,0,0.08);
+  --cyan: #556ADC;
+  --grn: #00D98A;
+  --red: #FF3D5C;
+  --amb: #FF8717;
+  --blu: #556ADC;
+  --pur: #9D7AFF;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--txt);
+  -webkit-font-smoothing: antialiased;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(85,106,220,0.2);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
+@layer components {
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    max-width: 1440px;
+  }
+
+  .glass-surface {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px);
+  }
+
+  .inner-glass-glow {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .card {
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 20px;
+    padding: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .audit-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .report-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  .report-actions {
+    width: 100%;
+    justify-content: flex-start !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-title {
+    font-size: 36px !important;
+  }
+}

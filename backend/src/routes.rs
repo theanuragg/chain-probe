@@ -2,7 +2,7 @@
 
 use axum::{extract::Json, http::StatusCode, response::{IntoResponse, Response}};
 use serde_json::json;
-use tracing::{info, warn};
+use tracing::{info, warn, error};
 
 use crate::{
     ai_enricher::AiEnricher,
@@ -70,43 +70,66 @@ pub async fn analyze(
         ).into_response();
     }
 
-    //   Stage 1: AST extraction                        ─
-    let mut visitor = ProjectVisitor::new();
-    for file in &req.files {
-        if file.path.ends_with(".rs")   { visitor.visit_rs_file(&file.path, &file.content); }
-        if file.path.ends_with(".toml") { visitor.visit_toml_file(&file.path, &file.content); }
-    }
-    info!(
-        "AST: {} instructions, {} account_structs, {} CPIs, {} PDAs",
-        visitor.instructions.len(),
-        visitor.account_structs.len(),
-        visitor.cpi_calls.len(),
-        visitor.pda_derivations.len(),
-    );
+    // Process with error handling
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        //   Stage 1: AST extraction                        ─
+        let mut visitor = ProjectVisitor::new();
+        
+        for file in &req.files {
+            if file.path.ends_with(".rs") {
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    visitor.visit_rs_file(&file.path, &file.content);
+                }));
+                if result.is_err() {
+                    warn!("Failed to parse .rs file: {}", file.path);
+                }
+            }
+            if file.path.ends_with(".toml") {
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    visitor.visit_toml_file(&file.path, &file.content);
+                }));
+                if result.is_err() {
+                    warn!("Failed to parse .toml file: {}", file.path);
+                }
+            }
+        }
+        info!(
+            "AST: {} instructions, {} account_structs, {} CPIs, {} PDAs",
+            visitor.instructions.len(),
+            visitor.account_structs.len(),
+            visitor.cpi_calls.len(),
+            visitor.pda_derivations.len(),
+        );
 
-    //   Stage 2: Pattern detection                       
-    let findings = patterns::detect_all(&visitor, &req.files);
-    info!("Patterns: {} findings", findings.len());
+        //   Stage 2: Pattern detection                       
+        let findings = patterns::detect_all(&visitor, &req.files);
+        info!("Patterns: {} findings", findings.len());
 
-    //   Stage 3: Profiling                           
-    let profile = compute_profile(&visitor, &req.files);
-    info!("Profile: complexity={}, anchor={}", profile.complexity, profile.anchor_version);
+        //   Stage 3: Profiling                           
+        let profile = compute_profile(&visitor, &req.files);
+        info!("Profile: complexity={}, anchor={}", profile.complexity, profile.anchor_version);
 
-    //   Stages 4–10: trust, taint, invariants, data_flow, call_graph,
-    //                 chains, scoring, vuln_db — all inside build_report    
-    let (mut report, ai_context) = build_report(findings, profile, &visitor, &req.files);
+        //   Stages 4–10: trust, taint, invariants, data_flow, call_graph,
+        //                 chains, scoring, vuln_db — all inside build_report    
+        let (mut report, ai_context) = build_report(findings, profile, &visitor, &req.files);
 
-    info!(
-        "Report: {} findings, {} chains, {} taint_flows, {} invariants ({} bypassable), {} token_anomalies, {} broken_perms, score={}",
-        report.summary.total,
-        report.summary.chain_count,
-        report.summary.taint_flow_count,
-        report.summary.invariant_count,
-        report.summary.bypassable_invariant_count,
-        report.summary.token_flow_anomaly_count,
-        report.summary.broken_permission_count,
-        report.summary.security_score,
-    );
+        info!(
+            "Report: {} findings, {} chains, {} taint_flows, {} invariants ({} bypassable), {} token_anomalies, {} broken_perms, score={}",
+            report.summary.total,
+            report.summary.chain_count,
+            report.summary.taint_flow_count,
+            report.summary.invariant_count,
+            report.summary.bypassable_invariant_count,
+            report.summary.token_flow_anomaly_count,
+            report.summary.broken_permission_count,
+            report.summary.security_score,
+        );
+
+        (report, ai_context)
+    }));
+
+    match result {
+        Ok((mut report, ai_context)) => {
 
     //   Optional: AI enrichment (Groq free tier)               
     let needs_ai = !ai_context.findings_needing_ai.is_empty()
@@ -131,6 +154,21 @@ pub async fn analyze(
 
     info!("Done: risk={} score={}", report.summary.overall_risk, report.summary.security_score);
     Json(report).into_response()
+}
+        Err(panic_err) => {
+            let msg = if let Some(s) = panic_err.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = panic_err.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "Unknown panic".to_string()
+            };
+            error!("Analysis panicked: {}", msg);
+            (StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Analysis failed", "details": msg }))
+            ).into_response()
+        }
+    }
 }
 
 //   POST /api/diff                               ─

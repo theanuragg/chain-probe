@@ -1,0 +1,17 @@
+export const C = {
+  bg: '#F8F9FB',
+  bg2: '#FFFFFF',
+  surf: '#FFFFFF',
+  txt: '#131313',
+  t2: '#4B5563',
+  t3: '#999999',
+  bdr: 'rgba(0,0,0,0.08)',
+  cyan: '#556ADC',
+  grn: '#00D98A',
+  red: '#FF3D5C',
+  amb: '#FF8717',
+  blu: '#556ADC',
+  pur: '#9D7AFF',
+  darkBg: '#0A101F',
+  darkSurface: '#131A2B',
+};
