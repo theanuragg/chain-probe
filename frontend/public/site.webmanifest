@@ -4,6 +4,18 @@
   "description": "Solana Anchor smart contract security analysis platform",
   "icons": [
     {
+      "src": "/favicon-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/og.png",
       "sizes": "1200x630",
       "type": "image/png",
