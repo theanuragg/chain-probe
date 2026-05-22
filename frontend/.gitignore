@@ -30,3 +30,6 @@ npm-debug.log*
 *.key
 credentials.json
 .vercel
+.next/*
+.next/
+out/

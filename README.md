@@ -940,3 +940,54 @@ ChainProbe does not use AI to detect vulnerabilities. Here is the precise reason
 **Access control:** Whether a `Signer<>` field exists in an Accounts struct is a type check. Deterministic.
 
 **Where AI does add value:** explaining what a vulnerability means in the context of *this specific program's business logic*. A missing signer on `update_config` is always a finding. But understanding that `config.fee_bps` flows into a fee calculation that can be set to 10000 (100%) and drain every subsequent swap — that requires understanding the program's purpose. That is the narrow case where we use AI.
+
+---
+
+## Deployment (example)
+
+This repository includes helper scripts and example configs to deploy the backend and frontend to a Linux server (example uses `root@68.183.103.58`). You must run the SSH commands from a machine that has network access to the server and your SSH key.
+
+Files added:
+
+- `deploy/backend-deploy.sh` — builds the backend and copies the binary and `systemd` unit to the remote host, then starts the service
+- `deploy/frontend-deploy.sh` — builds the frontend and rsyncs the `build/` output to the remote web root
+- `deploy/systemd/chainprobe.service` — example `systemd` unit for the backend
+- `deploy/nginx/chainprobe.conf` — example `nginx` site config to serve the frontend and proxy `/api` to the backend
+- `frontend/.env.production.example` — example env pointing `NEXT_PUBLIC_API_URL` to the deployed backend
+
+Quick deploy (from your local checkout):
+
+1. Make sure your SSH key can access the server (replace path if needed):
+
+```bash
+ssh -i ~/.ssh/id_ed25519 root@68.183.103.58
+```
+
+2. Deploy the backend (build locally and install on remote):
+
+```bash
+./deploy/backend-deploy.sh
+```
+
+3. Deploy the frontend (build and upload static artifacts):
+
+```bash
+API_URL=http://68.183.103.58:3001/api ./deploy/frontend-deploy.sh
+```
+
+4. On the remote server (example commands run on the server as root):
+
+```bash
+# place the nginx config at /etc/nginx/sites-available/chainprobe.conf
+# then symlink to /etc/nginx/sites-enabled/ and reload nginx
+cp /tmp/chainprobe.conf /etc/nginx/sites-available/chainprobe.conf
+ln -s /etc/nginx/sites-available/chainprobe.conf /etc/nginx/sites-enabled/chainprobe.conf
+nginx -t && systemctl reload nginx
+```
+
+Notes:
+
+- The backend listens on `PORT=3001` by default and the `systemd` unit at `/etc/systemd/system/chainprobe.service` runs `/opt/chainprobe/chainprobe`.
+- The nginx config proxies `/api` to `http://127.0.0.1:3001/` and serves static files from `/var/www/chainprobe`.
+- If you prefer serving frontend from the same origin without absolute API URL, set `NEXT_PUBLIC_API_URL=/api` when building the frontend.
+

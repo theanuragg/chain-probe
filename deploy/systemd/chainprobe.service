@@ -1,0 +1,15 @@
+[Unit]
+Description=Chainprobe backend
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/chainprobe
+ExecStart=/opt/chainprobe/chainprobe
+Restart=on-failure
+Environment=RUST_LOG=chainprobe=info
+Environment=PORT=3001
+
+[Install]
+WantedBy=multi-user.target
