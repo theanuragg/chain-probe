@@ -6,7 +6,7 @@ import { Shell, TopBar, SLabel } from '@/components/ui';
 import { Sb, DEMO_ESCROW, DEMO_SWAP } from '@/lib/styles';
 import { AnalysisReport, shouldKeep, filePriority } from '@/types';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 type InputMode = 'folder' | 'github' | 'paste';
 type Stage = 'idle' | 'loading' | 'analyzing' | 'done' | 'error';
