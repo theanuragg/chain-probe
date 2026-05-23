@@ -6,7 +6,8 @@ import { Shell, TopBar, SLabel } from '@/components/ui';
 import { Sb, DEMO_ESCROW, DEMO_SWAP } from '@/lib/styles';
 import { AnalysisReport, shouldKeep, filePriority } from '@/types';
 
-const API = process.env.NEXT_PUBLIC_API_URL || '/api';
+// Calls local Vercel proxy which proxies to backend
+const API = '/api/proxy';
 
 type InputMode = 'folder' | 'github' | 'paste';
 type Stage = 'idle' | 'loading' | 'analyzing' | 'done' | 'error';

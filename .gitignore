@@ -1,6 +1,4 @@
 # Environment files
-.env
-.env.local
 .env.*.local
 
 # Dependencies
@@ -30,3 +28,4 @@ npm-debug.log*
 *.key
 credentials.json
 .vercel
+config.bat
