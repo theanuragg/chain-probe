@@ -975,6 +975,23 @@ ssh -i ~/.ssh/id_ed25519 root@68.183.103.58
 API_URL=http://68.183.103.58:3001/api ./deploy/frontend-deploy.sh
 ```
 
+> If you are running the deploy script from the server itself and do not want to use SSH, set `REMOTE_HOST=127.0.0.1`.
+>
+> ```bash
+> REMOTE_HOST=127.0.0.1 bash deploy/backend-deploy.sh
+> REMOTE_HOST=127.0.0.1 bash deploy/frontend-deploy.sh
+> ```
+>
+> If the server repo was cloned before script updates, first run:
+>
+> ```bash
+git pull
+>
+> # then re-run the deploy script
+> REMOTE_HOST=127.0.0.1 bash deploy/backend-deploy.sh
+> REMOTE_HOST=127.0.0.1 bash deploy/frontend-deploy.sh
+> ```
+>
 4. On the remote server (example commands run on the server as root):
 
 ```bash
