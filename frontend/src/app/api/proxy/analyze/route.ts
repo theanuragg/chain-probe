@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.BACKEND_API_URL;
+const BACKEND_URL = (process.env.BACKEND_API_URL || '').replace(/\/api\/?$/, '');
 const BACKEND_API_KEY = process.env.BACKEND_API_KEY;
 
 export async function POST(request: NextRequest) {
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       headers['x-api-key'] = BACKEND_API_KEY;
     }
 
-    const response = await fetch(`${BACKEND_URL}/analyze`, {
+    const response = await fetch(`${BACKEND_URL}/api/analyze`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
