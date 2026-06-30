@@ -22,7 +22,52 @@ pub struct DiffRequest {
     pub current:  AnalysisReport,
 }
 
-pub async fn health() -> impl IntoResponse {
+//   Auth helper                              ─
+
+fn check_api_key(headers: &axum::http::HeaderMap) -> Result<(), Response> {
+    // Auth is ON by default — disable with REQUIRE_API_KEY=0
+    if std::env::var("REQUIRE_API_KEY").unwrap_or_default() == "0" {
+        return Ok(());
+    }
+    let api_key = headers
+        .get("x-api-key")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if api_key.is_empty() {
+        warn!("Auth: missing API key");
+        return Err((StatusCode::UNAUTHORIZED,
+            Json(json!({ "error": "API key required" }))
+        ).into_response());
+    }
+    let allowed = std::env::var("ALLOWED_API_KEYS").unwrap_or_default();
+    if !allowed.is_empty() {
+        let key_ok = allowed.split(',').any(|k| {
+            // Constant-time comparison to prevent timing attacks
+            let a = k.as_bytes();
+            let b = api_key.as_bytes();
+            if a.len() != b.len() { return false; }
+            let mut result = 0u8;
+            for i in 0..a.len() {
+                result |= a[i] ^ b[i];
+            }
+            result == 0
+        });
+        if !key_ok {
+            warn!("Auth: invalid API key attempt");
+            return Err((StatusCode::FORBIDDEN,
+                Json(json!({ "error": "Invalid API key" }))
+            ).into_response());
+        }
+    }
+    Ok(())
+}
+
+fn check_api_key_or_skip(headers: &axum::http::HeaderMap) -> Result<(), Response> {
+    check_api_key(headers)
+}
+
+pub async fn health(headers: axum::http::HeaderMap) -> impl IntoResponse {
+    let _ = check_api_key(&headers);
     Json(json!({
         "status": "ok",
         "version": "4.0.0",
@@ -39,27 +84,7 @@ pub async fn analyze(
     headers: axum::http::HeaderMap,
     Json(req): Json<AnalyzeRequest>,
 ) -> Response {
-    // Check API key if required
-    if std::env::var("REQUIRE_API_KEY").unwrap_or_default() == "1" {
-        let api_key = headers
-            .get("x-api-key")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-
-        if api_key.is_empty() {
-            return (StatusCode::UNAUTHORIZED,
-                Json(json!({ "error": "API key required" }))
-            ).into_response();
-        }
-
-        // Check against allowed keys (comma-separated in env)
-        let allowed = std::env::var("ALLOWED_API_KEYS").unwrap_or_default();
-        if !allowed.is_empty() && !allowed.split(',').any(|k| k == api_key) {
-            return (StatusCode::FORBIDDEN,
-                Json(json!({ "error": "Invalid API key" }))
-            ).into_response();
-        }
-    }
+    if let Err(resp) = check_api_key(&headers) { return resp; }
 
     let rs_count = req.files.iter().filter(|f| f.path.ends_with(".rs")).count();
     info!("Analyze request: {} files ({} .rs)", req.files.len(), rs_count);
@@ -69,6 +94,8 @@ pub async fn analyze(
             Json(json!({ "error": "No .rs files found in upload" }))
         ).into_response();
     }
+
+    let llm_consent = req.llm_consent;
 
     // Process with error handling
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -135,7 +162,9 @@ pub async fn analyze(
     let needs_ai = !ai_context.findings_needing_ai.is_empty()
         || !ai_context.chain_ids_needing_ai.is_empty();
 
-    if needs_ai {
+    if needs_ai && !llm_consent {
+        warn!("LLM consent not given — user code NOT sent to Groq API");
+    } else if needs_ai {
         match std::env::var("GROQ_API_KEY") {
             Ok(key) if !key.is_empty() => {
                 match AiEnricher::new(key).enrich(&report, &ai_context).await {
@@ -173,7 +202,11 @@ pub async fn analyze(
 
 //   POST /api/diff                               ─
 
-pub async fn diff_reports(Json(req): Json<DiffRequest>) -> Response {
+pub async fn diff_reports(
+    headers: axum::http::HeaderMap,
+    Json(req): Json<DiffRequest>,
+) -> Response {
+    if let Err(resp) = check_api_key(&headers) { return resp; }
     info!(
         "Diff: {} (score={}) vs {} (score={})",
         req.baseline.profile.program_name, req.baseline.summary.security_score,
@@ -193,28 +226,165 @@ pub async fn diff_reports(Json(req): Json<DiffRequest>) -> Response {
     Json(diff).into_response()
 }
 
-//   GET /api/report/:id/export                         
-
-pub async fn export_report(
-    path: axum::extract::Path<String>,
-) -> Response {
-    // For now, return the full report as JSON for download
-    // In production, this would load from database
-    Json(json!({
-        "message": "Use POST /api/analyze to generate reports",
-        "export_format": "json",
-    })).into_response()
-}
-
 //   GET /api/health/full                            ─
 
-pub async fn health_full() -> impl IntoResponse {
+pub async fn health_full(
+    headers: axum::http::HeaderMap,
+) -> impl IntoResponse {
+    let _ = check_api_key(&headers);
     Json(json!({
         "status": "ok",
         "version": "4.0.0",
         "features": {
             "ai_enrichment": std::env::var("GROQ_API_KEY").is_ok(),
-            "api_keys": std::env::var("REQUIRE_API_KEY").unwrap_or_default() == "1",
+            "api_keys": std::env::var("REQUIRE_API_KEY").unwrap_or_default() != "0",
+            "sarif_export": true,
+            "fuzz_harness": true,
+            "pinocchio_support": true,
         }
     }))
+}
+
+/// POST /api/export/sarif — export last analysis as SARIF
+pub async fn export_sarif(
+    headers: axum::http::HeaderMap,
+    Json(report): Json<AnalysisReport>,
+) -> Response {
+    if let Err(resp) = check_api_key(&headers) { return resp; }
+    let sarif = crate::sarif::report_to_sarif(&report);
+    (
+        StatusCode::OK,
+        [(axum::http::header::CONTENT_TYPE, "application/json")],
+        sarif,
+    ).into_response()
+}
+
+/// POST /api/export/fuzz — generate fuzz harness for last analysis
+pub async fn export_fuzz(
+    headers: axum::http::HeaderMap,
+    Json(report): Json<AnalysisReport>,
+) -> Response {
+    if let Err(resp) = check_api_key(&headers) { return resp; }
+    let format = "trident";
+    let harness = match format {
+        "trident" => crate::fuzz::generate_trident_harness(&report),
+        "litesvm" => crate::fuzz::generate_litesvm_test(&report),
+        _ => crate::fuzz::generate_python_test(&report),
+    };
+    (
+        StatusCode::OK,
+        [(axum::http::header::CONTENT_TYPE, "text/plain")],
+        harness,
+    ).into_response()
+}
+
+//   Monitor endpoints                      ─
+
+#[derive(serde::Deserialize)]
+pub struct StartMonitorRequest {
+    pub program_name: String,
+    #[serde(default)]
+    pub program_id: String,
+    #[serde(default = "default_cluster")]
+    pub cluster: String,
+    #[serde(default = "default_interval")]
+    pub interval_seconds: u64,
+}
+
+fn default_cluster() -> String { "mainnet-beta".to_string() }
+fn default_interval() -> u64 { 300 }
+
+pub async fn start_monitor(
+    headers: axum::http::HeaderMap,
+    Json(req): Json<StartMonitorRequest>,
+) -> Response {
+    if let Err(resp) = check_api_key(&headers) { return resp; }
+    let config = crate::monitor::MonitorConfig {
+        program_id: req.program_id,
+        cluster: req.cluster,
+        interval_seconds: req.interval_seconds,
+        ..Default::default()
+    };
+    let id = uuid::Uuid::new_v4().to_string();
+    let engine = crate::monitor::MonitoringEngine::new();
+    let job_id = engine.start_job(req.program_name, config).await;
+    info!("Monitor started: {}", job_id);
+    Json(serde_json::json!({
+        "status": "started",
+        "job_id": job_id,
+        "message": "Monitoring job created (skeleton — RPC polling not yet connected)",
+    })).into_response()
+}
+
+pub async fn stop_monitor(
+    headers: axum::http::HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Response {
+    if let Err(resp) = check_api_key(&headers) { return resp; }
+    info!("Monitor stopped: {}", id);
+    Json(serde_json::json!({
+        "status": "stopped",
+        "job_id": id,
+    })).into_response()
+}
+
+pub async fn monitor_status(
+    headers: axum::http::HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Response {
+    if let Err(resp) = check_api_key(&headers) { return resp; }
+    let engine = crate::monitor::MonitoringEngine::new();
+    match engine.get_job(&id).await {
+        Some(job) => Json(serde_json::json!({
+            "id": job.id,
+            "program_name": job.program_name,
+            "status": job.status,
+            "config": job.config,
+            "created_at": job.created_at,
+            "last_check_at": job.last_check_at,
+            "total_events": job.events.len(),
+            "error_count": job.error_count,
+            "total_checks": job.total_checks,
+        })).into_response(),
+        None => {
+            warn!("Monitor: job not found: {}", id);
+            (StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Monitor job not found"})),
+            ).into_response()
+        }
+    }
+}
+
+pub async fn monitor_events(
+    headers: axum::http::HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Response {
+    if let Err(resp) = check_api_key(&headers) { return resp; }
+    let engine = crate::monitor::MonitoringEngine::new();
+    let events = engine.get_events(&id, 100).await;
+    Json(serde_json::json!({
+        "job_id": id,
+        "events": events,
+        "count": events.len(),
+    })).into_response()
+}
+
+pub async fn monitor_health(
+    headers: axum::http::HeaderMap,
+) -> impl IntoResponse {
+    let _ = check_api_key(&headers);
+    let engine = crate::monitor::MonitoringEngine::new();
+    Json(engine.health_summary().await)
+}
+
+/// GET /api/report/:id/export — placeholder for stored report export
+pub async fn export_report(
+    headers: axum::http::HeaderMap,
+    _path: axum::extract::Path<String>,
+) -> Response {
+    let _ = check_api_key(&headers);
+    Json(json!({
+        "message": "Use POST /api/analyze to generate reports, then POST /api/export/sarif or /api/export/fuzz",
+        "export_formats": ["sarif", "fuzz/trident", "fuzz/litesvm", "fuzz/python"],
+    })).into_response()
 }

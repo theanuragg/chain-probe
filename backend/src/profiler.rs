@@ -1,7 +1,8 @@
 // backend/src/profiler.rs
 // Computes all profiling metrics from extracted AST data. Zero AI.
 
-use crate::{ast_visitor::ProjectVisitor, types::{InputFile, ProgramProfile}};
+use crate::{ast_visitor::ProjectVisitor, types::{Framework, InputFile, ProgramProfile}};
+use crate::framework;
 
 pub fn compute_profile(visitor: &ProjectVisitor, files: &[InputFile]) -> ProgramProfile {
     let rs_files: Vec<_> = files.iter().filter(|f| f.path.ends_with(".rs")).collect();
@@ -13,8 +14,26 @@ pub fn compute_profile(visitor: &ProjectVisitor, files: &[InputFile]) -> Program
         .filter(|f| f.is_signer)
         .count();
 
+    let fr = framework::detect_framework(visitor, files);
+
     // Framework patterns — detected from AST
     let mut patterns = vec![];
+
+    match fr {
+        Framework::Anchor => patterns.push("Anchor".into()),
+        Framework::Pinocchio => {
+            patterns.push("Pinocchio (no_std)".into());
+            if visitor.is_no_std { patterns.push("no_std".into()); }
+            if visitor.uses_pinocchio_log { patterns.push("Pinocchio log".into()); }
+            if visitor.uses_pinocchio_cpi { patterns.push("Pinocchio CPI".into()); }
+            if !visitor.pinocchio_manual_accounts.is_empty() {
+                patterns.push("manual account parsing".into());
+            }
+        }
+        Framework::Native => patterns.push("Native Solana".into()),
+        Framework::Unknown => patterns.push("Unknown framework".into()),
+    }
+
     if visitor.uses_init_if_needed { patterns.push("init_if_needed".into()); }
     if visitor.uses_token_2022 { patterns.push("Token-2022 / TokenInterface".into()); }
     if visitor.uses_token_program { patterns.push("SPL Token".into()); }
@@ -56,6 +75,7 @@ pub fn compute_profile(visitor: &ProjectVisitor, files: &[InputFile]) -> Program
 
     ProgramProfile {
         program_name: visitor.program_name.clone().unwrap_or_else(|| "unknown".into()),
+        framework: fr,
         anchor_version: visitor.anchor_version.clone().unwrap_or_else(|| "unknown".into()),
         files_analyzed: rs_files.len(),
         total_lines,

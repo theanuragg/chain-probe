@@ -945,7 +945,7 @@ ChainProbe does not use AI to detect vulnerabilities. Here is the precise reason
 
 ## Deployment (example)
 
-This repository includes helper scripts and example configs to deploy the backend and frontend to a Linux server (example uses `root@68.183.103.58`). You must run the SSH commands from a machine that has network access to the server and your SSH key.
+This repository includes helper scripts and example configs to deploy the backend and frontend to a Linux server. You must run the SSH commands from a machine that has network access to the server and your SSH key.
 
 Files added:
 
@@ -960,7 +960,7 @@ Quick deploy (from your local checkout):
 1. Make sure your SSH key can access the server (replace path if needed):
 
 ```bash
-ssh -i ~/.ssh/id_ed25519 root@68.183.103.58
+ssh -i ~/.ssh/id_ed25519 root@your-server-ip
 ```
 
 2. Deploy the backend (build locally and install on remote):
@@ -972,7 +972,7 @@ ssh -i ~/.ssh/id_ed25519 root@68.183.103.58
 3. Deploy the frontend (build and upload static artifacts):
 
 ```bash
-API_URL=http://68.183.103.58:3001/api ./deploy/frontend-deploy.sh
+API_URL=http://your-server-ip:3001/api ./deploy/frontend-deploy.sh
 ```
 
 > If you are running the deploy script from the server itself and do not want to use SSH, set `REMOTE_HOST=127.0.0.1`.

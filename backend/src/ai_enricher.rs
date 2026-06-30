@@ -4,6 +4,7 @@
 use anyhow::Result;
 use reqwest::Client;
 use serde_json::{json, Value};
+use std::time::Duration;
 use crate::types::{AiContext, AiEnrichmentResponse, AiFindingEnrichment, AiChainEnrichment, AnalysisReport};
 
 const GROQ_API: &str = "https://api.groq.com/openai/v1/chat/completions";
@@ -16,7 +17,7 @@ pub struct AiEnricher {
 
 impl AiEnricher {
     pub fn new(api_key: String) -> Self {
-        AiEnricher { client: Client::new(), api_key }
+        AiEnricher { client: Client::builder().timeout(Duration::from_secs(30)).build().unwrap(), api_key }
     }
 
     pub async fn enrich(

@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.BACKEND_API_URL || 'http://68.183.103.58:3001/api';
+const BACKEND_URL = process.env.BACKEND_API_URL;
 
 export async function POST(request: NextRequest) {
+  if (!BACKEND_URL) {
+    return NextResponse.json(
+      { error: 'Backend API URL not configured' },
+      { status: 500 }
+    );
+  }
+
   try {
     const body = await request.json();
 

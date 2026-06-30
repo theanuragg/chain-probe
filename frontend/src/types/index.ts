@@ -11,6 +11,15 @@ export type InvariantStatus = 'holds' | 'bypassable' | 'incomplete' | 'ordering_
 export type ExploitComplexity = 'trivial' | 'low' | 'medium' | 'high';
 export type FlowLinkType = 'pda_seeds' | 'has_one' | 'stored_pubkey' | 'type_match';
 
+export type Framework = 'anchor' | 'pinocchio' | 'native' | 'unknown';
+
+export const FRAMEWORK_BADGE: Record<Framework, {label: string; color: string; bg: string}> = {
+  anchor:    {label: 'Anchor',    color: '#556ADC', bg: 'rgba(85,106,220,0.12)'},
+  pinocchio: {label: 'Pinocchio', color: '#00D98A', bg: 'rgba(0,217,138,0.12)'},
+  native:    {label: 'Native',    color: '#FF8717', bg: 'rgba(255,135,23,0.12)'},
+  unknown:   {label: 'Unknown',   color: '#999999', bg: 'rgba(153,153,153,0.12)'},
+};
+
 //   Lookup maps                                ─
 
 export const SEV_COLOR: Record<Severity, string> = {
@@ -231,6 +240,7 @@ export interface AccountStructInfo {
 }
 export interface ProgramProfile {
   program_name: string;
+  framework: Framework;
   anchor_version: string;
   files_analyzed: number;
   total_lines: number;

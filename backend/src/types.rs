@@ -10,6 +10,8 @@ use chrono::{DateTime, Utc};
 #[derive(Deserialize, Debug)]
 pub struct AnalyzeRequest {
     pub files: Vec<InputFile>,
+    #[serde(default)]
+    pub llm_consent: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -130,6 +132,28 @@ impl Category {
             Category::StakingDrain => "staking_drain",
             Category::DelegationEscrow => "delegation_escrow",
             Category::ValidatorBribe => "validator_bribe",
+        }
+    }
+}
+
+//   Framework detection — NEW                     
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Framework {
+    Anchor,
+    Pinocchio,
+    Native,
+    Unknown,
+}
+
+impl Framework {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Framework::Anchor => "anchor",
+            Framework::Pinocchio => "pinocchio",
+            Framework::Native => "native",
+            Framework::Unknown => "unknown",
         }
     }
 }
@@ -455,6 +479,7 @@ pub struct ArithmeticOp {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ProgramProfile {
     pub program_name: String,
+    pub framework: Framework,
     pub anchor_version: String,
     pub files_analyzed: usize,
     pub total_lines: usize,

@@ -26,6 +26,14 @@ pub struct ProjectVisitor {
     pub overflow_checks_enabled: bool,
     pub dependency_count: usize,
     pub raw_lines: HashMap<String, Vec<String>>,
+    // Pinocchio support — NEW
+    pub is_pinocchio: bool,
+    pub is_no_std: bool,
+    pub pinocchio_manual_accounts: Vec<(String, String, String)>, // (function, account_var, type)
+    pub uses_pinocchio_log: bool,
+    pub uses_pinocchio_cpi: bool,
+    pub uses_raw_invoke: Vec<CpiCallInfo>,
+    pub pinocchio_program_id_checks: Vec<(String, usize)>, // (function, line)
 }
 
 impl ProjectVisitor {
@@ -48,6 +56,13 @@ impl ProjectVisitor {
             overflow_checks_enabled: false,
             dependency_count: 0,
             raw_lines: HashMap::new(),
+            is_pinocchio: false,
+            is_no_std: false,
+            pinocchio_manual_accounts: vec![],
+            uses_pinocchio_log: false,
+            uses_pinocchio_cpi: false,
+            uses_raw_invoke: vec![],
+            pinocchio_program_id_checks: vec![],
         }
     }
 
@@ -61,6 +76,28 @@ impl ProjectVisitor {
         );
         self.modules.push(path.to_string());
 
+        // Detectar Pinocchio imports e no_std
+        if content.contains("#![no_std]") || content.contains("#[no_std]") {
+            self.is_no_std = true;
+        }
+        if content.contains("use pinocchio") || content.contains("pinocchio::") {
+            self.is_pinocchio = true;
+        }
+        if content.contains("pinocchio::log")
+            || content.contains("pinocchio_log")
+            || content.contains("sol_log_")
+        {
+            self.uses_pinocchio_log = true;
+        }
+        if content.contains("pinocchio::cpi")
+            || content.contains("pinocchio_cpi")
+        {
+            self.uses_pinocchio_cpi = true;
+        }
+
+        // Detect Pinocchio entrypoint pattern
+        self.detect_pinocchio_entrypoint(path, content);
+
         match syn::parse_file(content) {
             Ok(file) => {
                 for item in &file.items {
@@ -72,6 +109,87 @@ impl ProjectVisitor {
                 self.line_level_fallback(path, content);
             }
         }
+    }
+
+    /// Detect Pinocchio-style entrypoint and manual account parsing
+    fn detect_pinocchio_entrypoint(&mut self, path: &str, content: &str) {
+        // Pinocchio entrypoint! macro
+        if content.contains("entrypoint!(process_instruction)") {
+            self.instructions.push(InstructionInfo {
+                name: "process_instruction".into(),
+                file: path.to_string(),
+                line: self.find_line(content, "entrypoint!"),
+                params: vec!["program_id".into(), "accounts".into(), "instruction_data".into()],
+                ctx_type: "PinocchioEntrypoint".into(),
+            });
+        }
+
+        // Pinocchio lazy_program_entrypoint
+        if content.contains("lazy_program_entrypoint!") {
+            self.instructions.push(InstructionInfo {
+                name: "process_instruction".into(),
+                file: path.to_string(),
+                line: self.find_line(content, "lazy_program_entrypoint!"),
+                params: vec![],
+                ctx_type: "PinocchioLazyEntrypoint".into(),
+            });
+        }
+
+        // Manual account parsing: accounts.iter() or &accounts[0..] patterns
+        for (i, line) in content.lines().enumerate() {
+            let t = line.trim();
+
+            // Detect manual account iteration
+            if t.contains("let accounts_iter = &mut accounts.iter()")
+                || t.contains("let account = &accounts[")
+            {
+                self.pinocchio_manual_accounts.push((
+                    self.get_current_function(content, i),
+                    t.to_string(),
+                    "Pinocchio".into(),
+                ));
+            }
+
+            // Detect raw CPI invocation (invoke_signed without Anchor wrappers)
+            if (t.contains("sol_invoke(") || t.contains("sol_invoke_signed(")
+                || t.contains("syscall::invoke"))
+                && !t.trim_start().starts_with("//")
+            {
+                self.uses_raw_invoke.push(CpiCallInfo {
+                    file: path.to_string(),
+                    line: i + 1,
+                    function_name: "sol_invoke".into(),
+                    program: "raw".into(),
+                });
+            }
+
+            // Detect program_id checks in Pinocchio: require!(program_id == ...)
+            if t.contains("program_id") && t.starts_with("if") {
+                let has_require = content.lines().skip(i).take(5).any(|l| {
+                    l.contains("require!") || l.contains("return Err(")
+                });
+                if has_require {
+                    self.pinocchio_program_id_checks
+                        .push((content.lines().nth(i).unwrap_or("").to_string(), i + 1));
+                }
+            }
+        }
+    }
+
+    fn find_line(&self, content: &str, pattern: &str) -> usize {
+        content.lines().position(|l| l.contains(pattern)).unwrap_or(0) + 1
+    }
+
+    fn get_current_function(&self, content: &str, line_idx: usize) -> String {
+        let lines: Vec<&str> = content.lines().take(line_idx).collect();
+        for line in lines.iter().rev() {
+            let t = line.trim();
+            if t.starts_with("pub fn ") || t.starts_with("fn ") {
+                return t.split('(').next().unwrap_or("")
+                    .split_whitespace().last().unwrap_or("").to_string();
+            }
+        }
+        String::new()
     }
 
     pub fn visit_toml_file(&mut self, path: &str, content: &str) {
@@ -137,6 +255,9 @@ impl ProjectVisitor {
                 }
 
                 if t.contains("init-if-needed") { self.uses_init_if_needed = true; }
+                if t.starts_with("pinocchio") { self.is_pinocchio = true; }
+                if t.starts_with("pinocchio-log") { self.uses_pinocchio_log = true; }
+                if t.starts_with("pinocchio-cpi") || t.starts_with("pinocchio_cpi") { self.uses_pinocchio_cpi = true; }
             }
 
             // Parse [workspace.dependencies] for anchor version
@@ -462,12 +583,36 @@ impl ProjectVisitor {
                 });
             }
 
+            // Pinocchio entrypoint detection in line-level fallback
+            if t == "pub fn process_instruction(" || t == "fn process_instruction(" {
+                let has_pinocchio_input = t.contains("&[AccountInfo]")
+                    || t.contains("program_id: &Pubkey")
+                    || content.lines().take(i + 5).any(|l| l.contains("&[AccountInfo]"));
+                if has_pinocchio_input {
+                    self.instructions.push(InstructionInfo {
+                        name: "process_instruction".into(),
+                        file: path.to_string(), line: i + 1,
+                        params: vec!["program_id".into(), "accounts".into(), "instruction_data".into()],
+                        ctx_type: "PinocchioEntrypoint".into(),
+                    });
+                }
+            }
+
             if t.contains("transfer(") || t.contains("transfer_checked(")
                 || t.contains("invoke(") || t.contains("close_account(") {
                 self.cpi_calls.push(CpiCallInfo {
                     file: path.to_string(), line: i + 1,
                     function_name: extract_call_name(t),
                     program: "unknown".to_string(),
+                });
+            }
+
+            // Pinocchio raw CPI patterns
+            if t.contains("sol_invoke(") || t.contains("sol_invoke_signed(") {
+                self.uses_raw_invoke.push(CpiCallInfo {
+                    file: path.to_string(), line: i + 1,
+                    function_name: "sol_invoke".into(),
+                    program: "raw".into(),
                 });
             }
         }

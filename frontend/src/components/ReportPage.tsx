@@ -13,7 +13,8 @@ import { SurfaceTab } from '@/components/tabs/SurfaceTab';
 import { ChainsTab } from '@/components/tabs/ChainsTab';
 import { FindingsTab } from '@/components/tabs/FindingsTab';
 import { AdvisoriesTab } from '@/components/tabs/AdvisoriesTab';
-import { AnalysisReport } from '@/types';
+import { AnalysisReport, FRAMEWORK_BADGE } from '@/types';
+import { CicdWizard } from '@/components/CicdWizard';
 
 type ReportTab = 'overview' | 'taint' | 'invariants' | 'tokens' | 'permissions' | 'surface' | 'chains' | 'findings' | 'advisories';
 
@@ -22,6 +23,7 @@ export default function ReportPage() {
   const searchParams = useSearchParams();
   const [report, setReport] = useState<AnalysisReport | null>(null);
   const [tab, setTab] = useState<ReportTab>('overview');
+  const [showCicd, setShowCicd] = useState(false);
 
   useEffect(() => {
     const data = searchParams?.get('data');
@@ -80,11 +82,17 @@ export default function ReportPage() {
               }} onClick={()=>router.push('/?page=audit')}>
                 ← Back to Audit
               </button>
-              <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:28,fontWeight:700,letterSpacing:'-0.02em',color:C.txt,marginBottom:6}}>
-                {report.profile.program_name} — Security Report
-              </h2>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
+                <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:28,fontWeight:700,letterSpacing:'-0.02em',color:C.txt}}>
+                  {report.profile.program_name} — Security Report
+                </h2>
+                {report.profile.framework && (() => {
+                  const fb = FRAMEWORK_BADGE[report.profile.framework] || FRAMEWORK_BADGE.unknown;
+                  return <span style={{fontSize:11,padding:'3px 10px',borderRadius:100,background:fb.bg,color:fb.color,fontWeight:600,border:`1px solid ${fb.color}20`}}>{fb.label}</span>;
+                })()}
+              </div>
               <p style={{fontSize:14,color:C.t3}}>
-                {report.profile.files_analyzed} files · {report.profile.total_lines.toLocaleString()} lines · Anchor {report.profile.anchor_version}
+                {report.profile.files_analyzed} files · {report.profile.total_lines.toLocaleString()} lines · {report.profile.framework === 'anchor' ? `Anchor ${report.profile.anchor_version}` : report.profile.framework || 'Unknown framework'}
               </p>
             </div>
             <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -96,6 +104,18 @@ export default function ReportPage() {
                 ...Sb.rbBtn,background:C.cyan,color:'#fff',border:'none',
                 fontSize:13,fontWeight:600
               }} onClick={()=>{const b=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`chainprobe-${report.profile.program_name}.json`;a.click();}}>Export JSON</button>
+              <button style={{
+                ...Sb.rbBtn,background:'#222',color:'#fff',border:'none',
+                fontSize:13,fontWeight:600
+              }} onClick={async ()=>{try{const{pdf}=await import('@react-pdf/renderer');const{PdfReport}=await import('@/lib/pdfReport');const blob=await pdf(<PdfReport report={report}/>).toBlob();const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`chainprobe-${report.profile.program_name}.pdf`;a.click();URL.revokeObjectURL(url)}catch(e){console.error('PDF export failed',e)}}}>Export PDF</button>
+              <button style={{
+                ...Sb.rbBtn,background:report.profile.framework==='pinocchio'?'#00D98A':'#556ADC',color:'#fff',border:'none',
+                fontSize:13,fontWeight:600
+              }} onClick={async ()=>{try{const res=await fetch('/api/export/sarif',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(report)});const sarif=await res.text();const b=new Blob([sarif],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`chainprobe-${report.profile.program_name}.sarif.json`;a.click()}catch(e){console.error('SARIF export failed',e)}}}>Export SARIF</button>
+              <button style={{
+                ...Sb.rbBtn,background:'#131313',color:'#fff',border:'none',
+                fontSize:13,fontWeight:600
+              }} onClick={()=>setShowCicd(true)}>CI/CD Setup</button>
             </div>
           </div>
         </div>
@@ -130,7 +150,10 @@ export default function ReportPage() {
         </div>
       </div>
 
-      {/* Tab Content */}
+            {showCicd && <CicdWizard report={report} onClose={() => setShowCicd(false)} />}
+
+      {/* Tab Content */
+      }
       <div style={{maxWidth:1440,margin:'0 auto',padding:'32px 24px 60px'}}>
         {tab==='overview'     && <OverviewTab report={report}/>}
         {tab==='taint'        && <TaintTab report={report}/>}

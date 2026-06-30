@@ -4,11 +4,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." >/dev/null && pwd)"
 REMOTE_USER=${REMOTE_USER:-root}
-REMOTE_HOST=${REMOTE_HOST:-68.183.103.58}
+REMOTE_HOST=${REMOTE_HOST:?REMOTE_HOST must be set (e.g. your-server-ip or domain)}
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519}"
 REMOTE_WEB_ROOT=${REMOTE_WEB_ROOT:-/var/www/chainprobe}
 FRONTEND_DIR=${FRONTEND_DIR:-$REPO_ROOT/frontend}
-API_URL=${API_URL:-http://68.183.103.58:3001/api}
+API_URL=${API_URL:?API_URL must be set (e.g. https://your-domain.com/api)}
 
 if [ ! -d "$FRONTEND_DIR" ]; then
   echo "ERROR: frontend directory not found: $FRONTEND_DIR" >&2

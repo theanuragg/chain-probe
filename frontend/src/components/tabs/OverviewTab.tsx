@@ -1,7 +1,7 @@
 import React from 'react';
 import { C } from '@/lib/constants';
 import { Sec } from '@/components/ui';
-import { AnalysisReport, Severity, Category, CategorySummary, CATEGORY_LABELS, SEV_BG, SEV_COLOR } from '@/types';
+import { AnalysisReport, Severity, Category, CategorySummary, CATEGORY_LABELS, SEV_BG, SEV_COLOR, FRAMEWORK_BADGE } from '@/types';
 
 export function OverviewTab({report}:{report:AnalysisReport}) {
   const sc = report.summary.security_score;
@@ -72,6 +72,16 @@ export function OverviewTab({report}:{report:AnalysisReport}) {
       </Sec>
 
       <Sec title="Program Profile">
+        {report.profile.framework && (() => {
+          const fb = FRAMEWORK_BADGE[report.profile.framework] || FRAMEWORK_BADGE.unknown;
+          return <div style={{marginBottom:14, display:'flex', gap:8, alignItems:'center'}}>
+            <span style={{fontSize:11, color:C.t3, fontWeight:600, textTransform:'uppercase', letterSpacing:'.06em'}}>Framework</span>
+            <span style={{fontSize:12, padding:'3px 12px', borderRadius:100, background:fb.bg, color:fb.color, fontWeight:600, border:`1px solid ${fb.color}20`}}>{fb.label}</span>
+            {report.profile.anchor_version !== 'unknown' && report.profile.framework === 'anchor' && (
+              <span style={{fontSize:11, color:C.t3}}>v{report.profile.anchor_version}</span>
+            )}
+          </div>;
+        })()}
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
           {[
             {l:'Instructions',v:report.profile.instructions_count,col:C.cyan},

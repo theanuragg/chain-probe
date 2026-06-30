@@ -31,6 +31,9 @@ pub fn detect_all(visitor: &ProjectVisitor, files: &[InputFile]) -> Vec<Finding>
     // Professional audit patterns (from Ackee, Neodyme, DeFimSOL)
     findings.extend(crate::pro_audits::detect_pro_audits(&visitor, files, &mut next_id));
 
+    // Pinocchio-specific detectors
+    findings.extend(crate::pinocchio::detect_pinocchio(visitor, files, &mut next_id));
+
     findings
 }
 

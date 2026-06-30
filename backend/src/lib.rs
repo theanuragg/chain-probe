@@ -23,6 +23,11 @@ pub mod ai_enricher;
 pub mod detectors;
 pub mod exploits;
 pub mod pro_audits;
+pub mod framework;
+pub mod pinocchio;
+pub mod sarif;
+pub mod fuzz;
+pub mod monitor;
 
 // Re-export the top-level entry points the CLI needs
 pub use report::build_report;

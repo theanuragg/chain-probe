@@ -16,10 +16,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@b9e0990d219a03df7633c93f6f005a8fecbcab22
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo audit
+        run: cd backend && cargo audit
 
       - name: Build ChainProbe
         run: cd backend && cargo build --release
@@ -32,9 +38,20 @@ jobs:
           echo "critical=$(./target/release/chainprobe --json | jq -r '.summary.critical_count')" >> $GITHUB_OUTPUT
           echo "chains=$(./target/release/chainprobe --json | jq -r '.summary.chain_count')" >> $GITHUB_OUTPUT
 
+      - name: Setup Node.js
+        uses: actions/setup-node@6a61c0375d66246de94630495909f12cf8dac84d
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      - name: Run npm audit
+        run: cd frontend && npm audit
+
       - name: Comment PR with results
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
             const score = ${{ steps.audit.outputs.score }};
@@ -66,21 +83,7 @@ jobs:
           exit 1
 
       - name: Upload report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: security-report
           path: chainprobe-report.json
-
-#
-# chainprobe-docker:
-#   runs-on: ubuntu-latest
-#   steps:
-#     - uses: actions/checkout@v4
-#     - name: Run ChainProbe container
-#       run: |
-#         docker run -v ${{ github.workspace }}:/code \
-#           chainprobe/chainprobe:latest /code --json > report.json
-#     - uses: actions/upload-artifact@v4
-#       with:
-#         name: report
-#         path: report.json

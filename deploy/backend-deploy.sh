@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." >/dev/null && pwd)"
 REMOTE_USER=${REMOTE_USER:-root}
-REMOTE_HOST=${REMOTE_HOST:-68.183.103.58}
+REMOTE_HOST=${REMOTE_HOST:?REMOTE_HOST must be set (e.g. your-server-ip or domain)}
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519}"
 REMOTE_PATH=${REMOTE_PATH:-/opt/chainprobe}
 BUILD_DIR=${BUILD_DIR:-$REPO_ROOT/backend}
@@ -32,8 +32,10 @@ if [ "$REMOTE_HOST" = "localhost" ] || [ "$REMOTE_HOST" = "127.0.0.1" ]; then
   exit 0
 fi
 
-echo "Creating remote directory..."
-ssh -i "$SSH_KEY" "$REMOTE_USER@$REMOTE_HOST" "mkdir -p $REMOTE_PATH && chown $REMOTE_USER:$REMOTE_USER $REMOTE_PATH"
+echo "Creating chainprobe user and remote directory..."
+ssh -i "$SSH_KEY" "$REMOTE_USER@$REMOTE_HOST" "\
+  id -u chainprobe &>/dev/null || useradd --system --no-create-home --shell /usr/sbin/nologin chainprobe; \
+  mkdir -p $REMOTE_PATH && chown chainprobe:chainprobe $REMOTE_PATH"
 
 echo "Copying binary..."
 scp -i "$SSH_KEY" "$BUILD_DIR/target/release/chainprobe" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/chainprobe"
@@ -41,7 +43,11 @@ scp -i "$SSH_KEY" "$BUILD_DIR/target/release/chainprobe" "$REMOTE_USER@$REMOTE_H
 echo "Uploading systemd unit..."
 scp -i "$SSH_KEY" "$SERVICE_FILE" "$REMOTE_USER@$REMOTE_HOST:/etc/systemd/system/chainprobe.service"
 
-echo "Reloading systemd, enabling and starting service..."
-ssh -i "$SSH_KEY" "$REMOTE_USER@$REMOTE_HOST" "systemctl daemon-reload && systemctl enable --now chainprobe"
+echo "Setting binary permissions and starting service..."
+ssh -i "$SSH_KEY" "$REMOTE_USER@$REMOTE_HOST" "\
+  chmod 755 $REMOTE_PATH/chainprobe && \
+  chown chainprobe:chainprobe $REMOTE_PATH/chainprobe && \
+  systemctl daemon-reload && \
+  systemctl enable --now chainprobe"
 
 echo "Backend deployed and started."
