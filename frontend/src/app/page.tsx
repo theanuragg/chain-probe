@@ -1,12 +1,15 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import LandingPage from "@/components/LandingPage";
 import AuditPage from "@/components/AuditPage";
 import ReportPage from "@/components/ReportPage";
 
-export default function Home({ searchParams }: { searchParams: { page?: string; data?: string } }) {
-  const page = searchParams.page || "home";
-  
+function PageContent() {
+  const searchParams = useSearchParams();
+  const page = searchParams.get("page") || "home";
+
   switch (page) {
     case "audit":
       return <AuditPage />;
@@ -15,4 +18,12 @@ export default function Home({ searchParams }: { searchParams: { page?: string; 
     default:
       return <LandingPage />;
   }
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={null}>
+      <PageContent />
+    </Suspense>
+  );
 }
