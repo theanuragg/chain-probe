@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_URL = process.env.BACKEND_API_URL;
+const BACKEND_API_KEY = process.env.BACKEND_API_KEY;
 
 export async function POST(request: NextRequest) {
   if (!BACKEND_URL) {
@@ -12,12 +13,16 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (BACKEND_API_KEY) {
+      headers['x-api-key'] = BACKEND_API_KEY;
+    }
 
     const response = await fetch(`${BACKEND_URL}/analyze`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(body),
     });
 
