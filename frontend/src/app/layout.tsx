@@ -1,5 +1,22 @@
 import type { Metadata } from "next";
+import { Instrument_Serif, Inter, JetBrains_Mono } from "next/font/google";
 import "@/styles/globals.css";
+
+const serif = Instrument_Serif({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-serif",
+});
+
+const sans = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
+
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+});
 
 export const metadata: Metadata = {
   title: {
@@ -79,7 +96,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${sans.variable} ${mono.variable} ${serif.variable}`}>
       <body>{children}</body>
     </html>
   );

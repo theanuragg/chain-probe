@@ -5,11 +5,9 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        serif: ['Playfair Display', 'Georgia', 'serif'],
-        display: ['Outfit', 'system-ui', 'sans-serif'],
-        'season-mix': ['Playfair Display', 'Georgia', 'serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        serif: ['var(--font-serif)', 'Georgia', 'serif'],
+        mono: ['var(--font-mono)', 'monospace'],
       },
       colors: {
         background: '#F8F9FB',
