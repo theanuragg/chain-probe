@@ -26,10 +26,10 @@ const HeroSection = () => {
           {/* Main Typography */}
           <div className="flex flex-col items-center gap-2.5 md:gap-3">
             <h1 className="max-w-4xl font-serif text-[48px] text-[#131313] md:text-[72px] text-center leading-[1.05] tracking-tight">
-              Static analysis that understands Anchor
+              Static analysis that understands Anchor <span className="text-[#00D98A]">·</span> Pinocchio
             </h1>
             <p className="max-w-[800px] font-sans text-[#4B5563] md:text-[22px] text-lg text-center leading-[1.6]">
-              A multi-stage static analysis engine built specifically for Anchor&apos;s account model. It understands what has_one, seeds, Signer&lt;&gt;, and CPI calls actually mean at the constraint level.
+              A multi-stage static analysis engine built for Anchor and Pinocchio programs. It understands what has_one, seeds, Signer&lt;&gt;, and CPI calls actually mean at the constraint level.
             </p>
           </div>
 

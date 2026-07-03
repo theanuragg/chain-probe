@@ -21,12 +21,12 @@ export function OverviewTab({report}:{report:AnalysisReport}) {
             <circle cx="50" cy="50" r={r} fill="none" stroke={col} strokeWidth="8" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ-(sc/100)*circ} style={{transition:'stroke-dashoffset 1.2s ease'}}/>
           </svg>
           <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
-            <span style={{fontFamily:"'Playfair Display',serif",fontSize:30,fontWeight:700,color:col}}>{sc}</span>
+            <span style={{fontFamily:"var(--font-serif)",fontSize:30,fontWeight:700,color:col}}>{sc}</span>
             <span style={{fontSize:10,color:C.t3,textTransform:'uppercase',letterSpacing:'.08em'}}>security</span>
           </div>
         </div>
         <div>
-          <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:700,marginBottom:6,color:C.txt}}>{report.summary.overall_risk} Risk</h3>
+          <h3 style={{fontFamily:"var(--font-serif)",fontSize:24,fontWeight:700,marginBottom:6,color:C.txt}}>{report.summary.overall_risk} Risk</h3>
           <p style={{fontSize:14,color:C.t2,lineHeight:1.6,marginBottom:14}}>
             {report.summary.total} findings · {report.summary.chain_count} chains · {report.summary.taint_flow_count} taint flows · {report.summary.bypassable_invariant_count} bypassable invariants
           </p>
@@ -96,7 +96,7 @@ export function OverviewTab({report}:{report:AnalysisReport}) {
           ].map(c=>(
             <div key={c.l} style={{background:'#fff',border:`1px solid ${C.bdr}`,borderRadius:16,padding:18}}>
               <div style={{fontSize:11,color:C.t3,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4,fontWeight:600}}>{c.l}</div>
-              <div style={{fontSize:24,fontWeight:700,color:c.col,fontFamily:"'Playfair Display',serif"}}>{c.v}</div>
+              <div style={{fontSize:24,fontWeight:700,color:c.col,fontFamily:"var(--font-serif)"}}>{c.v}</div>
             </div>
           ))}
         </div>

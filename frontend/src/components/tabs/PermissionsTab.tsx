@@ -47,7 +47,7 @@ export function PermissionsTab({report}:{report:AnalysisReport}) {
           background:'#fff',border:`1px solid ${C.bdr}`,borderRadius:16,padding:'16px 18px'
         }}>
           <div style={{fontSize:11,color:C.t3,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6,fontWeight:600}}>{s.l}</div>
-          <div style={{fontSize:28,fontWeight:700,color:s.col,fontFamily:"'Playfair Display',serif"}}>{s.v}</div>
+          <div style={{fontSize:28,fontWeight:700,color:s.col,fontFamily:"var(--font-serif)"}}>{s.v}</div>
         </div>
       ))}
     </div>

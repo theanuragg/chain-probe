@@ -19,7 +19,7 @@ const CTAFooter = () => {
           
           <div className="z-10 flex flex-col items-center gap-8 md:gap-12">
             <h2 className="font-serif text-[32px] md:text-[48px] text-white leading-[1.2] max-w-2xl font-normal">
-              Ship secure Anchor programs <br className="hidden md:block" /> with confidence.
+              Ship secure programs <br className="hidden md:block" /> with confidence.
             </h2>
             
             <div className="relative">
@@ -50,7 +50,7 @@ const CTAFooter = () => {
               <a href="/" className="inline-block">
                 <span className="font-bold text-xl text-[#131313]">ChainProbe</span>
               </a>
-              <p className="font-display text-[14px] text-gray-400">Static analysis for Anchor</p>
+              <p className="font-display text-[14px] text-gray-400">Static analysis for Anchor &amp; Pinocchio</p>
               
               <div className="flex gap-3 mt-2">
                 <div className="flex items-center gap-1.5 px-3 py-2 border border-gray-100 rounded-lg bg-white/50">
@@ -58,6 +58,9 @@ const CTAFooter = () => {
                 </div>
                 <div className="flex items-center gap-1.5 px-3 py-2 border border-gray-100 rounded-lg bg-white/50">
                   <span className="text-[10px] font-semibold text-gray-500 tracking-wide">ANCHOR</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-2 border border-gray-100 rounded-lg bg-white/50">
+                  <span className="text-[10px] font-semibold text-[#00D98A] tracking-wide">PINOCCHIO</span>
                 </div>
               </div>
           </div>
@@ -108,7 +111,7 @@ const CTAFooter = () => {
         {/* Bottom Footer Credits */}
         <div className="pt-8 border-t border-black/5 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-[12px] text-gray-400 font-display">Copyright ChainProbe 2026</p>
-          <p className="text-[12px] text-gray-400 font-display">Static analysis that understands Anchor</p>
+          <p className="text-[12px] text-gray-400 font-display">Static analysis for Anchor &amp; Pinocchio</p>
         </div>
       </footer>
     </div>

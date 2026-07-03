@@ -83,7 +83,7 @@ export default function ReportPage() {
                 ← Back to Audit
               </button>
               <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
-                <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:28,fontWeight:700,letterSpacing:'-0.02em',color:C.txt}}>
+                <h2 style={{fontFamily:"var(--font-serif)",fontSize:28,fontWeight:700,letterSpacing:'-0.02em',color:C.txt}}>
                   {report.profile.program_name} — Security Report
                 </h2>
                 {report.profile.framework && (() => {

@@ -74,12 +74,26 @@ const GLOW_FILTER_ID = 'graph-glow';
 const NODE_GRADIENT_INSTR = 'node-grad-instr';
 const NODE_GRADIENT_CPI = 'node-grad-cpi';
 const NODE_GRADIENT_ACCT = 'node-grad-acct';
-const EDGE_GRADIENT = 'edge-grad';
+
+function getQuadraticCurve(x1: number, y1: number, x2: number, y2: number): string {
+  if (x1 === x2 && y1 === y2) return '';
+  const cx = (x1 + x2) / 2;
+  const cy = (y1 + y2) / 2;
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  const nx = -dy / len * 20, ny = dx / len * 20;
+  return `M${x1},${y1} Q${cx + nx},${cy + ny} ${x2},${y2}`;
+}
 
 export function SurfaceTab({report}:{report:AnalysisReport}) {
   const [active, setActive] = useState<string|null>(null);
   const [hover, setHover] = useState<string|null>(null);
   const [tooltipPos, setTooltipPos] = useState<{x:number;y:number}|null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const svgRef = useRef<SVGSVGElement>(null);
 
   const instrNodes = report.call_graph.nodes.filter(n => n.node_type === 'instruction');
@@ -90,27 +104,36 @@ export function SurfaceTab({report}:{report:AnalysisReport}) {
     const added = new Set<string>();
     const rng = (seed: number) => { let s = seed; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; };
 
-    for (const n of instrNodes) {
+    const instrPositions: Array<{id:string,x:number,y:number}> = [];
+    const instrCount = instrNodes.length;
+    instrNodes.forEach((n, i) => {
       const id = n.id;
+      const angle = (i / instrCount) * Math.PI * 2 - Math.PI / 2;
+      const radius = 160 + (i % 3) * 20;
+      instrPositions.push({
+        id,
+        x: 400 + Math.cos(angle) * radius,
+        y: 150 + Math.sin(angle) * radius * 0.5,
+      });
       const rand = rng(id.length + id.charCodeAt(0));
       nodes.push({
         id, label: id,
         type: 'instruction',
-        x: 100 + rand() * 600,
-        y: 100 + rand() * 300,
+        x: instrPositions[i].x + (rand() - 0.5) * 20,
+        y: instrPositions[i].y + (rand() - 0.5) * 20,
         vx: 0, vy: 0,
         attack_surface_score: n.attack_surface_score,
       });
       added.add(id);
-    }
+    });
 
     for (const e of report.call_graph.edges) {
       if (!added.has(e.to)) {
         const rand = rng(e.to.length + e.to.charCodeAt(0));
         nodes.push({
           id: e.to, label: e.to.split('::').pop() || e.to,
-          type: 'cpi', x: 100 + rand() * 600,
-          y: 100 + rand() * 300, vx: 0, vy: 0,
+          type: 'cpi', x: 200 + rand() * 400,
+          y: 280 + rand() * 120, vx: 0, vy: 0,
         });
         added.add(e.to);
       }
@@ -118,8 +141,8 @@ export function SurfaceTab({report}:{report:AnalysisReport}) {
     }
 
     const acctAdded = new Set<string>();
-    for (const sa of report.data_flow.shared_accounts) {
-      if (acctAdded.has(sa.account_name)) continue;
+    report.data_flow.shared_accounts.forEach((sa, i) => {
+      if (acctAdded.has(sa.account_name)) return;
       acctAdded.add(sa.account_name);
       const trust = sa.max_trust_risk;
       const id = `acct:${sa.account_name}`;
@@ -127,8 +150,8 @@ export function SurfaceTab({report}:{report:AnalysisReport}) {
       nodes.push({
         id, label: sa.account_name,
         type: 'account',
-        x: 100 + rand() * 600,
-        y: 100 + rand() * 300,
+        x: 100 + i * 60 + rand() * 30,
+        y: 410 + rand() * 40,
         vx: 0, vy: 0,
         trust,
       });
@@ -137,7 +160,7 @@ export function SurfaceTab({report}:{report:AnalysisReport}) {
           edges.push({ from: instr, to: id });
         }
       }
-    }
+    });
 
     return { graphNodes: nodes, graphEdges: edges };
   }, [report]);
@@ -152,6 +175,33 @@ export function SurfaceTab({report}:{report:AnalysisReport}) {
       setTooltipPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     }
     setHover(nodeId);
+  }, []);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    setZoom(z => Math.max(0.3, Math.min(3, z * delta)));
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.target === svgRef.current || (e.target as SVGElement).tagName === 'svg') {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX, y: e.clientY });
+      setPanOffset({ x: pan.x, y: pan.y });
+    }
+  }, [pan]);
+
+  const handleMouseMovePan = useCallback((e: React.MouseEvent) => {
+    if (isPanning) {
+      setPan({
+        x: panOffset.x + (e.clientX - panStart.x),
+        y: panOffset.y + (e.clientY - panStart.y),
+      });
+    }
+  }, [isPanning, panOffset, panStart]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
   }, []);
 
   const nodeColors: Record<string, string> = {
@@ -174,11 +224,26 @@ export function SurfaceTab({report}:{report:AnalysisReport}) {
       padding: 0, marginBottom: 24, position: 'relative', overflow: 'hidden',
       minHeight: 500, boxShadow: '0 0 60px rgba(85,106,220,0.05)',
     }}>
-      <svg ref={svgRef} width="100%" height="500" viewBox="0 0 800 500" style={{ display: 'block' }}>
+      <svg
+        ref={svgRef}
+        width="100%" height="500"
+        viewBox="0 0 800 500"
+        style={{ display: 'block', cursor: isPanning ? 'grabbing' : 'grab' }}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMovePan}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
         <defs>
           <marker id={ARROW_ID} viewBox="0 0 10 10" refX="8" refY="5"
             markerWidth="6" markerHeight="6" orient="auto">
             <path d="M0,0 L10,5 L0,10 Z" fill={C.bdr} />
+          </marker>
+
+          <marker id="arrow-active" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill={C.cyan} />
           </marker>
 
           <filter id={GLOW_FILTER_ID} x="-50%" y="-50%" width="200%" height="200%">
@@ -189,9 +254,20 @@ export function SurfaceTab({report}:{report:AnalysisReport}) {
             </feMerge>
           </filter>
 
+          <filter id="glow-strong" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feComponentTransfer in="blur" result="glow">
+              <feFuncA type="linear" slope="0.6" />
+            </feComponentTransfer>
+            <feMerge>
+              <feMergeNode in="glow" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+
           <linearGradient id={NODE_GRADIENT_INSTR} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={C.cyan} stopOpacity="0.9" />
-            <stop offset="100%" stopColor={C.blu} stopOpacity="0.6" />
+            <stop offset="0%" stopColor="#7B93FF" stopOpacity="1" />
+            <stop offset="100%" stopColor={C.cyan} stopOpacity="1" />
           </linearGradient>
 
           <linearGradient id={NODE_GRADIENT_CPI} x1="0%" y1="0%" x2="100%" y2="100%">
@@ -204,133 +280,166 @@ export function SurfaceTab({report}:{report:AnalysisReport}) {
             <stop offset="100%" stopColor="#BDA4FF" stopOpacity="0.6" />
           </linearGradient>
 
-          <linearGradient id={EDGE_GRADIENT} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor={C.bdr} stopOpacity="0.6" />
-            <stop offset="100%" stopColor={C.cyan} stopOpacity="0.3" />
-          </linearGradient>
+          <radialGradient id="node-glow-instr" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor={C.cyan} stopOpacity="0.2" />
+            <stop offset="100%" stopColor={C.cyan} stopOpacity="0" />
+          </radialGradient>
 
           <filter id="node-shadow">
-            <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="rgba(0,0,0,0.12)" />
+            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="rgba(0,0,0,0.12)" />
           </filter>
 
           <filter id="node-shadow-active">
-            <feDropShadow dx="0" dy="2" stdDeviation="6" floodColor="rgba(85,106,220,0.3)" />
+            <feDropShadow dx="0" dy="2" stdDeviation="8" floodColor="rgba(85,106,220,0.35)" />
+          </filter>
+
+          <filter id="label-bg">
+            <feMorphology in="SourceAlpha" operator="dilate" radius="2" />
+            <feGaussianBlur stdDeviation="1" />
+            <feComponentTransfer><feFuncA type="linear" slope="0.85" /></feComponentTransfer>
+            <feMerge>
+              <feMergeNode />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
           </filter>
         </defs>
 
-        {graphEdges.map((e,i) => {
-          const from = graphNodes.find(n => n.id === e.from);
-          const to = graphNodes.find(n => n.id === e.to);
-          if (!from || !to) return null;
-          const isActive = selNode && (e.from === selNode || e.to === selNode);
-          const edgeColor = isActive ? C.cyan : C.bdr;
-          return <g key={`e${i}`}>
-            <line
-              x1={from.x} y1={from.y} x2={to.x} y2={to.y}
-              stroke={edgeColor}
-              strokeWidth={isActive ? 2 : 1}
-              strokeOpacity={isActive ? 0.7 : 0.3}
-              markerEnd={isActive ? `url(#${ARROW_ID})` : undefined}
-              style={{ transition: 'stroke-opacity 150ms ease-out, stroke-width 150ms ease-out' }}
-            />
-            {e.label && isActive && (
-              <text
-                x={(from.x + to.x) / 2} y={(from.y + to.y) / 2 - 8}
-                fontSize={9} fill={C.t3} textAnchor="middle"
-                style={{ fontFamily: "'JetBrains Mono', monospace" }}
-              >{e.label}</text>
-            )}
-          </g>;
-        })}
+        <g transform={`translate(${pan.x * zoom},${pan.y * zoom}) scale(${zoom})`}>
+          {graphEdges.map((e,i) => {
+            const from = graphNodes.find(n => n.id === e.from);
+            const to = graphNodes.find(n => n.id === e.to);
+            if (!from || !to) return null;
+            const isActive = selNode && (e.from === selNode || e.to === selNode);
+            const path = getQuadraticCurve(from.x, from.y, to.x, to.y);
+            if (!path) return null;
+            return <g key={`e${i}`}>
+              <path
+                d={path}
+                fill="none"
+                stroke={isActive ? C.cyan : C.bdr}
+                strokeWidth={isActive ? 2 : 1}
+                strokeOpacity={isActive ? 0.7 : 0.25}
+                markerEnd={isActive ? 'url(#arrow-active)' : undefined}
+                style={{ transition: 'stroke-opacity 200ms ease-out, stroke-width 200ms ease-out' }}
+              />
+              {e.label && isActive && (
+                <text
+                  x={(from.x + to.x) / 2} y={(from.y + to.y) / 2 - 10}
+                  fontSize={9} fill={C.t2}
+                  textAnchor="middle" fontWeight={500}
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                >{e.label}</text>
+              )}
+            </g>;
+          })}
 
-        {graphNodes.map(n => {
-          const isActive = selNode === n.id;
-          const color = nodeColors[n.type];
-          const size = n.type === 'instruction' ? 16 : n.type === 'cpi' ? 11 : 8;
-          const scoreCol = n.attack_surface_score ? attackSurfaceColor(n.attack_surface_score) : color;
-          const gradId = n.type === 'instruction' ? NODE_GRADIENT_INSTR
-            : n.type === 'cpi' ? NODE_GRADIENT_CPI
-            : NODE_GRADIENT_ACCT;
+          {graphNodes.map(n => {
+            const isActive = selNode === n.id;
+            const color = nodeColors[n.type];
+            const scoreCol = n.attack_surface_score ? attackSurfaceColor(n.attack_surface_score) : color;
 
-          return <g key={n.id}
-            onMouseEnter={(e) => handleMouseMove(e, n.id)}
-            onMouseLeave={() => { setHover(null); setTooltipPos(null); }}
-            onClick={() => setActive(active === n.id ? null : n.id)}
-            style={{ cursor: 'pointer' }}
-          >
-            <filter id={isActive ? 'node-shadow-active' : undefined}>
-            </filter>
-            {n.type === 'instruction' ? (
-              <>
-                <circle cx={n.x} cy={n.y} r={size + 2}
-                  fill="#fff" opacity={isActive ? 0.3 : 0}
-                  style={{ transition: 'opacity 200ms ease-out' }}
-                />
-                <circle cx={n.x} cy={n.y} r={size}
-                  fill={isActive ? `url(#${gradId})` : `#fff`}
-                  stroke={scoreCol}
-                  strokeWidth={isActive ? 3 : 2}
-                  opacity={selNode && !isActive ? 0.25 : 1}
-                  filter={isActive ? 'url(#node-shadow-active)' : 'url(#node-shadow)'}
-                  style={{ transition: 'stroke-width 150ms ease-out, opacity 200ms ease-out' }}
-                />
-                {isActive && (
-                  <circle cx={n.x} cy={n.y} r={size}
-                    fill="none" stroke={color} strokeWidth={1}
-                    opacity="0.4"
-                    filter="url(#graph-glow)"
+            return <g
+              key={n.id}
+              onMouseEnter={(e) => handleMouseMove(e, n.id)}
+              onMouseLeave={() => { setHover(null); setTooltipPos(null); }}
+              onClick={() => setActive(active === n.id ? null : n.id)}
+              style={{ cursor: 'pointer' }}
+            >
+              {n.type === 'instruction' ? (
+                <>
+                  {isActive && (
+                    <circle cx={n.x} cy={n.y} r={32}
+                      fill="url(#node-glow-instr)"
+                      style={{ transition: 'opacity 200ms ease-out' }}
+                    />
+                  )}
+                  <circle cx={n.x} cy={n.y} r={22}
+                    fill={C.bg2} opacity={isActive ? 0.8 : 0}
                     style={{ transition: 'opacity 200ms ease-out' }}
                   />
-                )}
-                <text x={n.x} y={n.y + 24} fontSize={10} fill={C.txt}
-                  textAnchor="middle" fontWeight={600}
-                  opacity={selNode && !isActive ? 0.25 : 1}
-                  style={{ fontFamily: "'Inter', sans-serif", transition: 'opacity 200ms ease-out' }}
-                >{n.label}</text>
-                {n.attack_surface_score !== undefined && (
-                  <text x={n.x} y={n.y + 36} fontSize={8} fill={scoreCol}
-                    textAnchor="middle" fontWeight={700}
-                    opacity={selNode && !isActive ? 0.25 : 1}
+                  <circle cx={n.x} cy={n.y} r={18}
+                    fill={isActive ? `url(#${NODE_GRADIENT_INSTR})` : `url(#${NODE_GRADIENT_INSTR})`}
+                    stroke={isActive ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)'}
+                    strokeWidth={isActive ? 2.5 : 1.5}
+                    opacity={selNode && !isActive ? 0.2 : 1}
+                    filter={isActive ? 'url(#node-shadow-active)' : 'url(#node-shadow)'}
+                    style={{ transition: 'stroke-width 150ms ease-out, opacity 200ms ease-out' }}
+                  />
+                  {isActive && (
+                    <>
+                      <circle cx={n.x} cy={n.y} r={18}
+                        fill="none" stroke={C.cyan} strokeWidth={2}
+                        opacity="0.5"
+                        filter="url(#glow-strong)"
+                        style={{ transition: 'opacity 200ms ease-out', pointerEvents: 'none' }}
+                      />
+                      <circle cx={n.x} cy={n.y} r={22}
+                        fill="none" stroke={C.cyan} strokeWidth={1}
+                        opacity="0.2"
+                        style={{ transition: 'opacity 200ms ease-out', pointerEvents: 'none' }}
+                      />
+                    </>
+                  )}
+                  {n.attack_surface_score !== undefined && (
+                    <text x={n.x + 22} y={n.y - 14} fontSize={8} fill={scoreCol}
+                      textAnchor="start" fontWeight={700}
+                      opacity={selNode && !isActive ? 0.2 : 0.8}
+                      style={{ fontFamily: "'JetBrains Mono', monospace", transition: 'opacity 200ms ease-out' }}
+                    >⬆ {n.attack_surface_score}</text>
+                  )}
+                </>
+              ) : n.type === 'cpi' ? (
+                <>
+                  <rect x={n.x - 16} y={n.y - 10} width={32} height={20} rx={6}
+                    fill={isActive ? `url(#${NODE_GRADIENT_CPI})` : '#fff'}
+                    stroke={color}
+                    strokeWidth={isActive ? 2.5 : 1.5}
+                    opacity={selNode && !isActive ? 0.2 : 1}
+                    filter={isActive ? 'url(#node-shadow-active)' : 'url(#node-shadow)'}
+                    style={{ transition: 'stroke-width 150ms ease-out, opacity 200ms ease-out' }}
+                  />
+                  <text x={n.x} y={n.y + 4} fontSize={8} fill={isActive ? '#fff' : color}
+                    textAnchor="middle" fontWeight={600}
+                    opacity={selNode && !isActive ? 0.2 : 1}
                     style={{ fontFamily: "'JetBrains Mono', monospace", transition: 'opacity 200ms ease-out' }}
-                  >⬆ {n.attack_surface_score}</text>
-                )}
-              </>
-            ) : n.type === 'cpi' ? (
-              <>
-                <rect x={n.x - 14} y={n.y - 9} width={28} height={18} rx={5}
-                  fill={isActive ? `url(#${gradId})` : '#fff'}
-                  stroke={color}
-                  strokeWidth={isActive ? 2.5 : 1.5}
-                  opacity={selNode && !isActive ? 0.25 : 1}
-                  filter={isActive ? 'url(#node-shadow-active)' : undefined}
-                  style={{ transition: 'stroke-width 150ms ease-out, opacity 200ms ease-out' }}
-                />
-                <text x={n.x} y={n.y + 4} fontSize={8} fill={isActive ? '#fff' : color}
-                  textAnchor="middle" fontWeight={600}
-                  opacity={selNode && !isActive ? 0.25 : 1}
-                  style={{ fontFamily: "'JetBrains Mono', monospace", transition: 'opacity 200ms ease-out' }}
-                >{n.label.slice(0, 14)}</text>
-              </>
-            ) : (
-              <>
-                <circle cx={n.x} cy={n.y} r={size}
-                  fill={isActive ? `url(#${gradId})` : '#fff'}
-                  stroke={color}
-                  strokeWidth={isActive ? 2.5 : 1.5}
-                  opacity={selNode && !isActive ? 0.25 : 1}
-                  filter={isActive ? 'url(#node-shadow-active)' : undefined}
-                  style={{ transition: 'stroke-width 150ms ease-out, opacity 200ms ease-out' }}
-                />
-                {isActive && (
-                  <text x={n.x} y={n.y + 18} fontSize={8} fill={C.t3}
-                    textAnchor="middle"
-                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                  >{n.label}</text>
-                )}
-              </>
-            )}
-          </g>;
-        })}
+                  >{n.label.slice(0, 14)}</text>
+                </>
+              ) : (
+                <>
+                  <circle cx={n.x} cy={n.y} r={8}
+                    fill={isActive ? `url(#${NODE_GRADIENT_ACCT})` : '#fff'}
+                    stroke={color}
+                    strokeWidth={isActive ? 2.5 : 1.5}
+                    opacity={selNode && !isActive ? 0.2 : 1}
+                    filter={isActive ? 'url(#node-shadow-active)' : 'url(#node-shadow)'}
+                    style={{ transition: 'stroke-width 150ms ease-out, opacity 200ms ease-out' }}
+                  />
+                  {n.label.length > 10 ? (
+                    <>
+                      <text x={n.x + 14} y={n.y - 2} fontSize={8} fill={C.t2}
+                        textAnchor="start" fontWeight={500}
+                        opacity={selNode && !isActive ? 0.2 : 0.7}
+                        style={{ fontFamily: "'JetBrains Mono', monospace", transition: 'opacity 200ms ease-out' }}
+                      >{n.label.slice(0, 18)}</text>
+                      {isActive && n.label.length > 18 && (
+                        <text x={n.x + 14} y={n.y + 8} fontSize={7} fill={C.t3}
+                          textAnchor="start"
+                          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                        >{n.label.slice(18)}</text>
+                      )}
+                    </>
+                  ) : (
+                    <text x={n.x + 14} y={n.y + 2} fontSize={8} fill={C.t2}
+                      textAnchor="start" fontWeight={500}
+                      opacity={selNode && !isActive ? 0.2 : 0.7}
+                      style={{ fontFamily: "'JetBrains Mono', monospace", transition: 'opacity 200ms ease-out' }}
+                    >{n.label}</text>
+                  )}
+                </>
+              )}
+            </g>;
+          })}
+        </g>
       </svg>
 
       {selNode && tooltipPos && !instrNodes.find(n => n.id === selNode) && (
@@ -352,13 +461,26 @@ export function SurfaceTab({report}:{report:AnalysisReport}) {
           whiteSpace: 'nowrap',
         }}>
           <strong>{selNode.replace('acct:', '')}</strong>
-          {graphNodes.find(n => n.id === selNode)?.trust && (
-            <span style={{ marginLeft: 8, color: TRUST_COLOR[graphNodes.find(n => n.id === selNode)!.trust!], fontWeight: 600 }}>
-              {TRUST_LABEL[graphNodes.find(n => n.id === selNode)!.trust!]}
+          {graphNodes.find(nd => nd.id === selNode)?.trust && (
+            <span style={{ marginLeft: 8, color: TRUST_COLOR[graphNodes.find(nd => nd.id === selNode)!.trust!], fontWeight: 600 }}>
+              {TRUST_LABEL[graphNodes.find(nd => nd.id === selNode)!.trust!]}
             </span>
           )}
         </div>
       )}
+
+      <div style={{
+        position: 'absolute', bottom: 16, right: 16, display: 'flex', gap: 6,
+        opacity: zoom !== 1 ? 1 : 0, transition: 'opacity 200ms',
+        pointerEvents: zoom !== 1 ? 'auto' : 'none',
+      }}>
+        <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
+          style={{
+            fontSize: 11, padding: '4px 12px', borderRadius: 8,
+            border: `1px solid ${C.bdr}`, background: '#fff', cursor: 'pointer',
+            color: C.t2, fontFamily: "'Inter', sans-serif", fontWeight: 500,
+          }}>Reset</button>
+      </div>
     </div>
 
     {selNode && instrNodes.find(n => n.id === selNode) && (() => {
@@ -375,11 +497,12 @@ export function SurfaceTab({report}:{report:AnalysisReport}) {
         padding: 28,
         marginBottom: 24,
         boxShadow: '0 4px 32px rgba(85,106,220,0.1)',
+        animation: 'fadeIn 200ms ease-out',
       }}>
         <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:24}}>
           <div style={{
-            width:6,height:6,borderRadius:'50%',background:C.cyan,
-            boxShadow:`0 0 12px ${C.cyan}40`,
+            width:8,height:8,borderRadius:'50%',background:C.cyan,
+            boxShadow:`0 0 16px ${C.cyan}50`,
           }} />
           <span style={{fontSize:18,fontWeight:700,color:C.txt,fontFamily:"'Inter',sans-serif",letterSpacing:'-0.01em'}}>{selNode}</span>
           <span style={{

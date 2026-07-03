@@ -59,7 +59,7 @@ export const metadata: Metadata = {
     url: "https://chainprobe.xyz",
     title: "ChainProbe — Solana Anchor Smart Contract Security Analysis",
     description:
-      "Detect vulnerabilities and secure your Solana Anchor programs with automated static analysis. The trusted security platform for Solana DeFi.",
+      "Detect vulnerabilities and secure your Solana Anchor and Pinocchio programs with automated static analysis. The trusted security platform for Solana DeFi.",
     siteName: "ChainProbe",
     images: [
       {

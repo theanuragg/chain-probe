@@ -62,46 +62,53 @@ const styles = StyleSheet.create({
   coverDivider: {
     width: 60,
     height: 2,
-    backgroundColor: '#222',
-    marginVertical: 30,
+    backgroundColor: '#556ADC',
+    marginVertical: 24,
   },
   coverTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    letterSpacing: 1,
+    color: '#111',
   },
   coverSubtitle: {
-    fontSize: 11,
-    color: '#666',
+    fontSize: 12,
+    color: '#556ADC',
     textAlign: 'center',
-    marginTop: 8,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    marginTop: 4,
+    letterSpacing: 2,
+    textTransform: 'uppercase' as const,
   },
   coverMeta: {
     fontSize: 9,
     color: '#888',
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: 2,
+  },
+  coverMetaHighlight: {
+    fontSize: 9,
+    color: '#556ADC',
+    textAlign: 'center',
+    marginTop: 2,
+    fontWeight: 'bold',
   },
   brandLine: {
-    fontSize: 14,
-    color: '#444',
+    fontSize: 11,
+    color: '#888',
     textAlign: 'center',
-    letterSpacing: 4,
-    textTransform: 'uppercase',
+    letterSpacing: 3,
+    textTransform: 'uppercase' as const,
     marginTop: 20,
   },
   sectionHeading: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#111',
-    marginBottom: 12,
-    marginTop: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: '#222',
+    marginBottom: 10,
+    marginTop: 6,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#556ADC',
     paddingBottom: 4,
   },
   subHeading: {
@@ -120,7 +127,7 @@ const styles = StyleSheet.create({
   },
   bodyText: {
     fontSize: 10,
-    color: '#333',
+    color: '#444',
     lineHeight: 1.6,
     marginBottom: 4,
   },
@@ -131,43 +138,56 @@ const styles = StyleSheet.create({
   },
   kvRow: {
     flexDirection: 'row',
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#f0f0f0',
+    alignItems: 'center',
   },
   kvLabel: {
-    width: 160,
-    fontSize: 10,
+    width: 140,
+    fontSize: 9,
+    color: '#888',
     fontWeight: 'bold',
-    color: '#444',
   },
   kvValue: {
     flex: 1,
-    fontSize: 10,
+    fontSize: 9,
     color: '#222',
+    fontFamily: 'Courier',
   },
   scoreRow: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 12,
     marginTop: 6,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   scoreBox: {
     flex: 1,
-    padding: 8,
+    padding: 10,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#e5e7eb',
   },
   scoreLabel: {
     fontSize: 8,
     color: '#888',
-    textTransform: 'uppercase',
+    textTransform: 'uppercase' as const,
     letterSpacing: 0.5,
-    marginBottom: 2,
+    marginBottom: 4,
+    fontWeight: 'bold',
   },
   scoreValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
+  },
+  scoreBar: {
+    height: 4,
+    backgroundColor: '#f3f4f6',
+    marginTop: 4,
+    borderRadius: 2,
+  },
+  scoreFill: {
+    height: '100%',
+    borderRadius: 2,
   },
   sevBreakdown: {
     flexDirection: 'row',
@@ -176,9 +196,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sevPill: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 3,
-    borderRadius: 3,
+    borderRadius: 2,
   },
   sevPillText: {
     fontSize: 9,
@@ -198,75 +218,77 @@ const styles = StyleSheet.create({
   summaryTable: {
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#e5e7eb',
   },
   summaryRow: {
     flexDirection: 'row',
     borderBottomWidth: 0.5,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#f0f0f0',
+    alignItems: 'center',
   },
   summaryRowEven: {
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#f9fafb',
   },
   summaryHeader: {
     flexDirection: 'row',
-    backgroundColor: '#222',
-    borderBottomWidth: 1,
-    borderBottomColor: '#222',
+    backgroundColor: '#556ADC',
   },
   summaryCellId: {
     width: 50,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     fontSize: 9,
     fontWeight: 'bold',
-    color: '#ccc',
+    color: '#fff',
   },
   summaryCellSev: {
     width: 60,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     fontSize: 9,
   },
   summaryCellTitle: {
     flex: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     fontSize: 9,
+    fontWeight: 'bold',
+    color: '#fff',
   },
   summaryCellCat: {
     width: 90,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    fontSize: 8,
-    color: '#666',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    fontSize: 9,
+    color: '#fff',
   },
   summaryCellIdData: {
     width: 50,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     fontSize: 9,
     fontFamily: 'Courier',
     color: '#555',
   },
   summaryCellSevData: {
     width: 60,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     fontSize: 9,
   },
   summaryCellTitleData: {
     flex: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     fontSize: 9,
+    color: '#333',
   },
   summaryCellCatData: {
     width: 90,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     fontSize: 8,
-    color: '#666',
+    color: '#888',
   },
   sevBadge: {
     paddingHorizontal: 6,
@@ -283,49 +305,50 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#e5e7eb',
   },
   findingHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: '#f9fafb',
     borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    borderBottomColor: '#e5e7eb',
   },
   findingId: {
     fontSize: 11,
     fontWeight: 'bold',
     fontFamily: 'Courier',
+    color: '#556ADC',
   },
   findingTitle: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: 'bold',
     color: '#222',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 4,
   },
   findingBody: {
-    paddingHorizontal: 10,
-    paddingBottom: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
   },
   findLabel: {
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: 'bold',
     color: '#888',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 6,
-    marginBottom: 2,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.8,
+    marginTop: 8,
+    marginBottom: 3,
   },
   codeBlock: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f9fafb',
     borderWidth: 0.5,
-    borderColor: '#ddd',
-    padding: 6,
+    borderColor: '#e5e7eb',
+    padding: 8,
     marginVertical: 4,
     fontFamily: 'Courier',
     fontSize: 8,
@@ -343,10 +366,37 @@ const styles = StyleSheet.create({
   spacer4: { height: 4 },
   spacer8: { height: 8 },
   spacer16: { height: 16 },
+  spacer24: { height: 24 },
+  coverTop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  coverBottom: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  riskBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 4,
+    marginTop: 16,
+  },
+  riskText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#fff',
+    letterSpacing: 2,
+    textTransform: 'uppercase' as const,
+  },
 });
 
 function getSevBg(sev: Severity) {
   return SEV_COLORS[sev] || '#888';
+}
+
+function getRiskColor(risk: string): string {
+  return risk === 'critical' ? '#FF3D5C' : risk === 'high' ? '#FFAA33' : risk === 'medium' ? '#3D8EFF' : '#00D98A';
 }
 
 function groupFindings(findings: Finding[]): Record<Severity, Finding[]> {
@@ -364,12 +414,13 @@ function formatLabel(s: string): string {
 
 const CoverPage = ({ report }: { report: AnalysisReport }) => (
   <Page size="A4" style={styles.coverPage}>
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <View style={styles.coverTop}>
+      <Text style={{ fontSize: 10, color: '#556ADC', letterSpacing: 4, textTransform: 'uppercase', marginBottom: 20 }}>ChainProbe</Text>
+      <Text style={{ fontSize: 9, color: '#888', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 40 }}>Security Audit Report</Text>
       <Text style={styles.coverTitle}>
         {report.profile.program_name.toUpperCase()}
       </Text>
       <View style={styles.coverDivider} />
-      <Text style={styles.coverSubtitle}>ChainProbe · Security Audit</Text>
       <Text style={styles.coverMeta}>
         {new Date(report.analyzed_at).toLocaleDateString('en-US', {
           year: 'numeric',
@@ -378,10 +429,27 @@ const CoverPage = ({ report }: { report: AnalysisReport }) => (
         })}
       </Text>
       <Text style={styles.coverMeta}>Report ID: {report.id}</Text>
+      <View style={[styles.riskBadge, { backgroundColor: getRiskColor(report.summary.overall_risk) }]}>
+        <Text style={styles.riskText}>{report.summary.overall_risk.toUpperCase()} RISK</Text>
+      </View>
+      <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+        {(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] as Severity[]).map(sev => {
+          const count = report.summary[sev.toLowerCase() as 'critical' | 'high' | 'medium' | 'low' | 'info'];
+          if (!count) return null;
+          return (
+            <View key={sev} style={[styles.sevPill, { backgroundColor: SEV_COLORS[sev] }]}>
+              <Text style={styles.sevPillText}>{count} {SEV_LABELS[sev]}</Text>
+            </View>
+          );
+        })}
+      </View>
+      <Text style={[styles.coverMeta, { marginTop: 12 }]}>
+        Security Score: {report.summary.security_score}/100
+      </Text>
     </View>
-    <View style={{ alignItems: 'center', marginBottom: 40 }}>
+    <View style={styles.coverBottom}>
       <Text style={styles.brandLine}>chainprobe</Text>
-      <Text style={[styles.coverMeta, { marginTop: 2 }]}>
+      <Text style={[styles.coverMeta, { marginTop: 4 }]}>
         Automated Solana Security Analysis
       </Text>
     </View>
@@ -393,7 +461,7 @@ const AboutSection = () => (
     <Text style={styles.sectionHeading}>About ChainProbe</Text>
     <Text style={styles.bodyText}>
       ChainProbe is an automated Solana security analyzer that performs static analysis
-      on Anchor-based Solana programs. It combines pattern matching, data-flow tracking,
+      on Anchor and Pinocchio-based Solana programs. It combines pattern matching, data-flow tracking,
       and invariant analysis to identify potential vulnerabilities across multiple
       categories including account validation, arithmetic overflows, signer authority,
       PDA seed collisions, reentrancy, and access control issues.
@@ -414,24 +482,26 @@ const SystemOverviewSection = ({ report }: { report: AnalysisReport }) => (
   <View wrap={false}>
     <Text style={styles.sectionHeading}>System Overview</Text>
     <View style={styles.kvRow}>
-      <Text style={styles.kvLabel}>Program Name</Text>
+      <Text style={styles.kvLabel}>Program</Text>
       <Text style={styles.kvValue}>{report.profile.program_name}</Text>
     </View>
     <View style={styles.kvRow}>
-      <Text style={styles.kvLabel}>Anchor Version</Text>
-      <Text style={styles.kvValue}>{report.profile.anchor_version}</Text>
+      <Text style={styles.kvLabel}>Framework</Text>
+      <Text style={[styles.kvValue, { fontFamily: 'Helvetica' }]}>{report.profile.framework || 'Unknown'}</Text>
     </View>
+    {report.profile.anchor_version !== 'unknown' && (
+      <View style={styles.kvRow}>
+        <Text style={styles.kvLabel}>Version</Text>
+        <Text style={[styles.kvValue, { fontFamily: 'Helvetica' }]}>{report.profile.anchor_version}</Text>
+      </View>
+    )}
     <View style={styles.kvRow}>
       <Text style={styles.kvLabel}>Complexity</Text>
-      <Text style={styles.kvValue}>{report.profile.complexity}</Text>
+      <Text style={[styles.kvValue, { fontFamily: 'Helvetica' }]}>{report.profile.complexity}</Text>
     </View>
     <View style={styles.kvRow}>
       <Text style={styles.kvLabel}>Total Lines</Text>
       <Text style={styles.kvValue}>{report.profile.total_lines.toLocaleString()}</Text>
-    </View>
-    <View style={styles.kvRow}>
-      <Text style={styles.kvLabel}>Rust Lines</Text>
-      <Text style={styles.kvValue}>{report.profile.rs_lines.toLocaleString()}</Text>
     </View>
     <View style={styles.kvRow}>
       <Text style={styles.kvLabel}>Files Analyzed</Text>
@@ -460,7 +530,7 @@ const SystemOverviewSection = ({ report }: { report: AnalysisReport }) => (
     {report.profile.overflow_checks_enabled !== undefined && (
       <View style={styles.kvRow}>
         <Text style={styles.kvLabel}>Overflow Checks</Text>
-        <Text style={styles.kvValue}>{report.profile.overflow_checks_enabled ? 'Enabled' : 'Disabled'}</Text>
+        <Text style={[styles.kvValue, { fontFamily: 'Helvetica' }]}>{report.profile.overflow_checks_enabled ? 'Enabled' : 'Disabled'}</Text>
       </View>
     )}
   </View>
@@ -468,30 +538,39 @@ const SystemOverviewSection = ({ report }: { report: AnalysisReport }) => (
 
 const SecurityPostureSection = ({ report }: { report: AnalysisReport }) => (
   <View wrap={false}>
-    <Text style={styles.sectionHeading}>Overall Security Posture</Text>
+    <Text style={styles.sectionHeading}>Security Posture</Text>
     <View style={styles.scoreRow}>
       <View style={styles.scoreBox}>
         <Text style={styles.scoreLabel}>Security Score</Text>
         <Text style={[styles.scoreValue, { color: report.summary.security_score >= 70 ? '#00D98A' : report.summary.security_score >= 40 ? '#FFAA33' : '#FF3D5C' }]}>
           {report.summary.security_score}/100
         </Text>
+        <View style={styles.scoreBar}>
+          <View style={[styles.scoreFill, { width: `${report.summary.security_score}%`, backgroundColor: report.summary.security_score >= 70 ? '#00D98A' : report.summary.security_score >= 40 ? '#FFAA33' : '#FF3D5C' }]} />
+        </View>
       </View>
       <View style={styles.scoreBox}>
         <Text style={styles.scoreLabel}>Attack Surface</Text>
         <Text style={[styles.scoreValue, { color: report.summary.attack_surface_score <= 30 ? '#00D98A' : report.summary.attack_surface_score <= 60 ? '#FFAA33' : '#FF3D5C' }]}>
           {report.summary.attack_surface_score}/100
         </Text>
+        <View style={styles.scoreBar}>
+          <View style={[styles.scoreFill, { width: `${report.summary.attack_surface_score}%`, backgroundColor: report.summary.attack_surface_score <= 30 ? '#00D98A' : report.summary.attack_surface_score <= 60 ? '#FFAA33' : '#FF3D5C' }]} />
+        </View>
       </View>
       <View style={styles.scoreBox}>
-        <Text style={styles.scoreLabel}>Hardening Score</Text>
+        <Text style={styles.scoreLabel}>Hardening</Text>
         <Text style={[styles.scoreValue, { color: report.summary.hardening_score >= 70 ? '#00D98A' : report.summary.hardening_score >= 40 ? '#FFAA33' : '#FF3D5C' }]}>
           {report.summary.hardening_score}/100
         </Text>
+        <View style={styles.scoreBar}>
+          <View style={[styles.scoreFill, { width: `${report.summary.hardening_score}%`, backgroundColor: report.summary.hardening_score >= 70 ? '#00D98A' : report.summary.hardening_score >= 40 ? '#FFAA33' : '#FF3D5C' }]} />
+        </View>
       </View>
     </View>
-    <View style={styles.kvRow}>
+    <View style={[styles.kvRow, { borderBottomWidth: 0 }]}>
       <Text style={styles.kvLabel}>Overall Risk</Text>
-      <Text style={[styles.kvValue, { fontWeight: 'bold', color: report.summary.overall_risk === 'critical' || report.summary.overall_risk === 'high' ? '#FF3D5C' : report.summary.overall_risk === 'medium' ? '#FFAA33' : '#00D98A' }]}>
+      <Text style={[styles.kvValue, { fontFamily: 'Helvetica', fontWeight: 'bold', color: getRiskColor(report.summary.overall_risk) }]}>
         {report.summary.overall_risk.toUpperCase()}
       </Text>
     </View>
@@ -515,8 +594,8 @@ const SecurityPostureSection = ({ report }: { report: AnalysisReport }) => (
         {Object.entries(report.category_summary).map(([cat, cs]) => (
           <View key={cat} style={styles.kvRow}>
             <Text style={styles.kvLabel}>{formatLabel(cat)}</Text>
-            <Text style={styles.kvValue}>
-              {cs.count} finding{cs.count !== 1 ? 's' : ''} · {cs.max_severity}
+            <Text style={[styles.kvValue, { fontFamily: 'Helvetica', color: getRiskColor(cs.max_severity.toLowerCase()) }]}>
+              {cs.count} finding{cs.count !== 1 ? 's' : ''} · max {cs.max_severity}
             </Text>
           </View>
         ))}
@@ -536,7 +615,7 @@ const TechnicalOverviewSection = ({ report }: { report: AnalysisReport }) => (
             <Text style={[styles.kvLabel, { fontFamily: 'Courier', fontSize: 9 }]}>
               {ins.name}
             </Text>
-            <Text style={[styles.kvValue, { fontSize: 9, fontFamily: 'Courier', color: '#666' }]}>
+            <Text style={[styles.kvValue, { fontSize: 9, color: '#888' }]}>
               {ins.file}:{ins.line}
             </Text>
           </View>
@@ -600,7 +679,7 @@ const ScopeSection = ({ report }: { report: AnalysisReport }) => (
         ))
       ) : (
         <Text style={styles.bodyText}>
-          {report.profile.files_analyzed} files analyzed (see module tree)
+          {report.profile.files_analyzed} files analyzed
         </Text>
       )}
     </View>
@@ -660,7 +739,7 @@ const DetailedFindingsSection = ({ findings }: { findings: Finding[] }) => {
             <Text
               style={[
                 styles.subHeading,
-                { color: SEV_COLORS[sev], borderBottomWidth: 1, borderBottomColor: SEV_COLORS[sev], paddingBottom: 2 },
+                { color: SEV_COLORS[sev], borderBottomWidth: 1, borderBottomColor: SEV_COLORS[sev], paddingBottom: 2, marginTop: 18 },
               ]}
             >
               {SEV_LABELS[sev]} Severity
@@ -675,24 +754,24 @@ const DetailedFindingsSection = ({ findings }: { findings: Finding[] }) => {
                 <View style={styles.findingBody}>
                   <View style={styles.kvRow}>
                     <Text style={styles.kvLabel}>File</Text>
-                    <Text style={[styles.kvValue, { fontFamily: 'Courier', fontSize: 9 }]}>
+                    <Text style={[styles.kvValue, { fontSize: 9 }]}>
                       {f.file}{f.line ? `:${f.line}` : ''}
                     </Text>
                   </View>
                   <View style={styles.kvRow}>
                     <Text style={styles.kvLabel}>Function</Text>
-                    <Text style={[styles.kvValue, { fontFamily: 'Courier', fontSize: 9 }]}>
+                    <Text style={[styles.kvValue, { fontSize: 9 }]}>
                       {f.function}
                     </Text>
                   </View>
                   <View style={styles.kvRow}>
                     <Text style={styles.kvLabel}>Category</Text>
-                    <Text style={styles.kvValue}>{formatLabel(f.category)}</Text>
+                    <Text style={[styles.kvValue, { fontFamily: 'Helvetica' }]}>{formatLabel(f.category)}</Text>
                   </View>
                   {f.cwe && (
                     <View style={styles.kvRow}>
                       <Text style={styles.kvLabel}>CWE</Text>
-                      <Text style={[styles.kvValue, { fontFamily: 'Courier', fontSize: 9 }]}>
+                      <Text style={[styles.kvValue, { fontSize: 9 }]}>
                         {f.cwe}
                       </Text>
                     </View>
