@@ -31,6 +31,9 @@ pub fn detect_advanced(visitor: &ProjectVisitor, files: &[InputFile], next_id: &
     findings.extend(detect_scope_validation(visitor, files, next_id));
     findings.extend(detect_executable_accounts(visitor, files, next_id));
     
+    // Delegate & Access Control
+    findings.extend(detect_delegate_withdrawal_no_owner_check(visitor, files, next_id));
+    
     findings
 }
 
@@ -712,6 +715,75 @@ fn detect_executable_accounts(visitor: &ProjectVisitor, files: &[InputFile], nex
     out
 }
 
+fn detect_delegate_withdrawal_no_owner_check(visitor: &ProjectVisitor, files: &[InputFile], next_id: &mut impl FnMut() -> String) -> Vec<Finding> {
+    let mut out = vec![];
+
+    for file in files {
+        if !file.path.ends_with(".rs") { continue; }
+        let content = &file.content;
+        let lines: Vec<&str> = content.lines().collect();
+
+        if !content.contains("delegate") { continue; }
+
+        for (i, line) in lines.iter().enumerate() {
+            let t = line.trim();
+
+            // Find delegation-related operations: delegate_withdraw, delegate_transfer, etc.
+            if (t.contains("delegate") || t.contains("Delegate"))
+                && (t.contains("withdraw") || t.contains("Withdraw")
+                    || t.contains("transfer") || t.contains("Transfer")
+                    || t.contains("drain") || t.contains("Drain"))
+                && !t.contains("//")
+            {
+                let ctx_start = i.saturating_sub(15);
+                let ctx_end = (i + 20).min(lines.len());
+                let ctx_str = lines[ctx_start..ctx_end].join("\n");
+
+                // Check if there's an owner/signer verification
+                let has_owner_check = ctx_str.contains("owner.key()") || ctx_str.contains("authority.key()")
+                    || ctx_str.contains("Signer") || ctx_str.contains("has_one")
+                    || ctx_str.contains("require_keys_eq") || ctx_str.contains("require!")
+                    && ctx_str.contains("owner");
+
+                let has_delegate_auth = ctx_str.contains("delegate")
+                    && ctx_str.contains("authority");
+
+                if !has_owner_check || (!has_delegate_auth && has_owner_check) {
+                    let snippet = get_line_snippet_det(content, i, 6);
+                    out.push(Finding {
+                        id: next_id(),
+                        severity: Severity::High,
+                        category: Category::AccessControl,
+                        title: "Delegate withdrawal without owner verification".into(),
+                        file: file.path.clone(),
+                        line: Some(i + 1),
+                        function: String::new(),
+                        snippet,
+                        description: "This function allows a delegate to withdraw or transfer \
+                            tokens/assets but does NOT verify that the delegate is authorized \
+                            by the owner. A delegate should only act on behalf of an owner with \
+                            explicit approval. Without owner verification, any account can claim \
+                            to be a delegate and drain the owner's funds.".into(),
+                        recommendation: "Verify the delegate has been approved by the owner: \
+                            `require!(delegate.owner == authority.key(), UnauthorizedDelegate)` \
+                            or use a delegation registry that maps owner -> delegate.".into(),
+                        anchor_fix: "require!(delegate.owner == authority.key(), Unauthorized)".into(),
+                        cwe: "CWE-862".into(),
+                        needs_ai_context: false,
+                        ai_explanation: None,
+                        ai_severity: None,
+                        exploitability: 0,
+                        confirmed_by_taint: vec![],
+                    });
+                    break;
+                }
+            }
+        }
+    }
+
+    out
+}
+
 fn get_snippet(file: &InputFile, pattern: &str, _lines: usize) -> (String, usize) {
     for (i, line) in file.content.lines().enumerate() {
         if line.contains(pattern) {
@@ -722,4 +794,11 @@ fn get_snippet(file: &InputFile, pattern: &str, _lines: usize) -> (String, usize
         }
     }
     (String::new(), 0)
+}
+
+fn get_line_snippet_det(content: &str, line_idx: usize, ctx: usize) -> String {
+    let lines: Vec<&str> = content.lines().collect();
+    let start = line_idx.saturating_sub(ctx);
+    let end = (line_idx + ctx + 1).min(lines.len());
+    lines[start..end].join("\n").to_string()
 }

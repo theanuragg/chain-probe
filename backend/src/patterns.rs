@@ -22,6 +22,10 @@ pub fn detect_all(visitor: &ProjectVisitor, files: &[InputFile]) -> Vec<Finding>
     findings.extend(check_reentrancy(visitor, files, &mut next_id));
     findings.extend(check_access_control(visitor, files, &mut next_id));
 
+    // v4.2 detectors
+    findings.extend(check_reinit_without_data_is_empty(visitor, files, &mut next_id));
+    findings.extend(check_self_cpi_reentrancy(visitor, files, &mut next_id));
+
     // Advanced v4.1 detectors
     findings.extend(crate::detectors::detect_advanced(visitor, files, &mut next_id));
 
@@ -822,6 +826,191 @@ exploitability: 0,
                     confirmed_by_taint: vec![],
                     });
                     break;
+                }
+            }
+        }
+    }
+
+    out
+}
+
+//   7. REINIT WITHOUT data_is_empty()               ─
+
+fn check_reinit_without_data_is_empty(
+    visitor: &ProjectVisitor,
+    files: &[InputFile],
+    next_id: &mut impl FnMut() -> String,
+) -> Vec<Finding> {
+    let mut out = vec![];
+
+    for s in &visitor.account_structs {
+        let is_init_target = visitor.instructions.iter().any(|i| {
+            i.ctx_type == s.name
+        });
+
+        if !is_init_target { continue; }
+
+        let file = files.iter().find(|f| f.path == s.file);
+        if let Some(f) = file {
+            let lines: Vec<&str> = f.content.lines().collect();
+            for (i, line) in lines.iter().enumerate() {
+                let t = line.trim();
+                if t.contains(&s.name) && (t.contains("init(") || t.contains("init_if_needed")
+                    || t.contains("#[account("))
+                {
+                    let ctx_start = i.saturating_sub(10);
+                    let ctx_end = (i + 15).min(lines.len());
+                    let ctx_str = lines[ctx_start..ctx_end].join("\n");
+
+                    let has_guard = ctx_str.contains("data_is_empty()")
+                        || ctx_str.contains("data_is_empty")
+                        || ctx_str.contains("!account.data_is_empty")
+                        || ctx_str.contains("!s.data_is_empty")
+                        || ctx_str.contains(".is_initialized");
+
+                    if !has_guard {
+                        let snippet = get_line_snippet(&f.content, i, 6);
+                        out.push(Finding {
+                            id: next_id(),
+                            severity: Severity::High,
+                            category: Category::AccountValidation,
+                            title: format!("`{}` reinit not guarded by data_is_empty() — account can be overwritten", s.name),
+                            file: s.file.clone(),
+                            line: Some(i + 1),
+                            function: String::new(),
+                            snippet,
+                            description: format!(
+                                "Account `{}` is initialized with `init`/`init_if_needed` but the \
+                                init block is not guarded by `data_is_empty()`. An attacker can \
+                                pass an already-initialized account, and the program will overwrite \
+                                its data. Allows resetting any account to initial state.",
+                                s.name
+                            ),
+                            recommendation: "Guard the init block: \
+                                `if account.data_is_empty() { /* init */ }`. In Anchor, \
+                                `init_if_needed` with proper discriminator checks is safer.".into(),
+                            anchor_fix: format!("if {}.data_is_empty() {{ /* init */ }}", s.name.to_lowercase()),
+                            cwe: "CWE-472".into(),
+                            needs_ai_context: false,
+                            ai_explanation: None,
+                            ai_severity: None,
+                            exploitability: 0,
+                            confirmed_by_taint: vec![],
+                        });
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    out
+}
+
+//   8. SELF-CPI REENTRANCY                         ─
+
+fn check_self_cpi_reentrancy(
+    visitor: &ProjectVisitor,
+    files: &[InputFile],
+    next_id: &mut impl FnMut() -> String,
+) -> Vec<Finding> {
+    let mut out = vec![];
+
+    for file in files {
+        if !file.path.ends_with(".rs") { continue; }
+        let content = &file.content;
+        let lines: Vec<&str> = content.lines().collect();
+
+        for (i, line) in lines.iter().enumerate() {
+            let t = line.trim();
+            let is_self_cpi = t.contains("cpi::invoke")
+                && (t.contains("self.") || t.contains("Self::") || t.contains("crate::"))
+                && !t.contains("//");
+
+            if is_self_cpi {
+                let ctx_start = i.saturating_sub(10);
+                let ctx_end = (i + 20).min(lines.len());
+                let ctx_str = lines[ctx_start..ctx_end].join("\n");
+
+                let has_reentrancy_guard = ctx_str.contains("REENTRANCY")
+                    || ctx_str.contains("reentrant") || ctx_str.contains("entered")
+                    || ctx_str.contains("mutex") || ctx_str.contains("lock")
+                    || ctx_str.contains("ENTERED") || ctx_str.contains("guard")
+                    || ctx_str.contains("invoking");
+
+                if !has_reentrancy_guard {
+                    let snippet = get_line_snippet(content, i, 6);
+                    out.push(Finding {
+                        id: next_id(),
+                        severity: Severity::Critical,
+                        category: Category::Reentrancy,
+                        title: "Self-CPI without reentrancy guard — arbitrary re-entry".into(),
+                        file: file.path.clone(),
+                        line: Some(i + 1),
+                        function: String::new(),
+                        snippet,
+                        description: "This program invokes a CPI back to itself (self-CPI) without \
+                            a reentrancy guard. Self-CPI allows the program's own instructions to \
+                            be re-entered before the first invocation completes, which can bypass \
+                            access controls or drain vaults. Mango and Crema exploits used self-CPI.".into(),
+                        recommendation: "Add a reentrancy guard: store an `entered` flag, check \
+                            at instruction start, clear on exit. Or avoid self-CPI entirely.".into(),
+                        anchor_fix: "struct State { entered: bool } /* check at instr start */".into(),
+                        cwe: "CWE-841".into(),
+                        needs_ai_context: false,
+                        ai_explanation: None,
+                        ai_severity: None,
+                        exploitability: 0,
+                        confirmed_by_taint: vec![],
+                    });
+                }
+            }
+        }
+    }
+
+    for file in files {
+        if !file.path.ends_with(".rs") { continue; }
+        let content = &file.content;
+        let lines: Vec<&str> = content.lines().collect();
+
+        for (i, line) in lines.iter().enumerate() {
+            let t = line.trim();
+            if t.contains("invoke(") || t.contains("invoke_signed(") {
+                let ctx_str = lines[i.saturating_sub(3)..lines.len().min(i + 10)].join("\n");
+                let is_self = ctx_str.contains("self.") || ctx_str.contains("ID")
+                    || ctx_str.contains("program_id");
+
+                if is_self {
+                    let ctx_end = (i + 20).min(lines.len());
+                    let full_ctx = lines[i.saturating_sub(5)..ctx_end].join("\n");
+                    let has_guard = full_ctx.contains("REENTRANCY") || full_ctx.contains("entered")
+                        || full_ctx.contains("mutex") || full_ctx.contains("lock")
+                        || full_ctx.contains("ENTERED");
+
+                    if !has_guard {
+                        let snippet = get_line_snippet(content, i, 6);
+                        out.push(Finding {
+                            id: next_id(),
+                            severity: Severity::Critical,
+                            category: Category::Reentrancy,
+                            title: "Raw invoke to own program without reentrancy guard".into(),
+                            file: file.path.clone(),
+                            line: Some(i + 1),
+                            function: String::new(),
+                            snippet,
+                            description: "A raw `invoke` or `invoke_signed` targets this program's \
+                                own ID, creating a reentrant call path. Without a guard, an attacker \
+                                can recursively call back into the program before state changes finalize.".into(),
+                            recommendation: "Add a reentrancy mutex or avoid self-targeting CPI.".into(),
+                            anchor_fix: "state.entered = true; /* logic */ state.entered = false;".into(),
+                            cwe: "CWE-841".into(),
+                            needs_ai_context: false,
+                            ai_explanation: None,
+                            ai_severity: None,
+                            exploitability: 0,
+                            confirmed_by_taint: vec![],
+                        });
+                    }
                 }
             }
         }

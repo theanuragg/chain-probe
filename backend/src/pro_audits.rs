@@ -83,6 +83,15 @@ pub fn detect_pro_audits(visitor: &ProjectVisitor, files: &[InputFile], next_id:
     findings.extend(detect_validator_bribe(files, next_id));
     findings.extend(detect_vote_manipulation(files, next_id));
     
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // ORACLE & DEFI ADVANCED (v4.2)
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    findings.extend(detect_single_oracle_no_twap(files, next_id));
+    findings.extend(detect_flash_loan_no_repayment(files, next_id));
+    findings.extend(detect_share_price_donation(files, next_id));
+    findings.extend(detect_stale_oracle_price(files, next_id));
+    findings.extend(detect_timestamp_dependence(files, next_id));
+    
     findings
 }
 
@@ -1346,12 +1355,389 @@ fn detect_vote_manipulation(files: &[InputFile], next_id: &mut impl FnMut() -> S
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
+// SINGLE ORACLE — NO TWAP
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+fn detect_single_oracle_no_twap(files: &[InputFile], next_id: &mut impl FnMut() -> String) -> Vec<Finding> {
+    let mut out = vec![];
+    for file in files {
+        if !file.path.ends_with(".rs") { continue; }
+        let content = &file.content;
+        let lines: Vec<&str> = content.lines().collect();
+
+        // Check if only one oracle price feed is used
+        let oracle_count = content.matches("oracle").count()
+            + content.matches("price_feed").count()
+            + content.matches("pyth").count()
+            + content.matches("switchboard").count();
+
+        if oracle_count < 2 { continue; }
+
+        // Now check if a TWAP is used anywhere
+        let has_twap = content.contains("twap") || content.contains("TWAP")
+            || content.contains("ema") || content.contains("EMA")
+            || content.contains("moving_average") || content.contains("rolling_average")
+            || content.contains("historical_price");
+
+        for (i, line) in lines.iter().enumerate() {
+            let t = line.trim();
+            if (t.contains("oracle") || t.contains("price_feed") || t.contains("pyth"))
+                && !t.contains("//")
+            {
+                let ctx_start = i.saturating_sub(5);
+                let ctx_end = (i + 10).min(lines.len());
+                let ctx_str = lines[ctx_start..ctx_end].join("\n");
+
+                let uses_single = ctx_str.matches("oracle").count() <= 1
+                    || ctx_str.matches("price_feed").count() <= 1;
+                let is_price_calc = ctx_str.contains("price") || ctx_str.contains("value")
+                    || ctx_str.contains("amount") || ctx_str.contains("collateral");
+
+                if uses_single && is_price_calc && !has_twap {
+                    let snippet = get_snippet(file, i + 1);
+                    out.push(Finding {
+                        id: next_id(),
+                        severity: Severity::High,
+                        category: Category::OracleManip,
+                        title: "Single oracle price feed without TWAP — flash loan manipulation".into(),
+                        file: file.path.clone(),
+                        line: Some(i + 1),
+                        function: String::new(),
+                        snippet,
+                        description: "This program reads a price from a single oracle feed without \
+                            using a time-weighted average price (TWAP). A single oracle price can be \
+                            manipulated via flash loans or large swaps that temporarily skew the \
+                            oracle's reported price. This allows an attacker to borrow against \
+                            inflated collateral or liquidate healthy positions at a favorable price.".into(),
+                        recommendation: "Use a TWAP oracle (e.g., Pyth's EMA price) or compute a \
+                            TWAP from multiple historical observations. For critical operations like \
+                            liquidation or borrowing, require the TWAP price rather than the spot price.".into(),
+                        anchor_fix: "Use pyth_solana_receiver with ema_price instead of price".into(),
+                        cwe: "CWE-682".into(),
+                        needs_ai_context: false,
+                        ai_explanation: None,
+                        ai_severity: None,
+                        exploitability: 0,
+                        confirmed_by_taint: vec![],
+                    });
+                    break;
+                }
+            }
+        }
+    }
+    out
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// FLASH LOAN — NO REPAYMENT CHECK
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+fn detect_flash_loan_no_repayment(files: &[InputFile], next_id: &mut impl FnMut() -> String) -> Vec<Finding> {
+    let mut out = vec![];
+    for file in files {
+        if !file.path.ends_with(".rs") { continue; }
+        let content = &file.content;
+        let lines: Vec<&str> = content.lines().collect();
+
+        // Check if flash loan is implemented
+        if !content.contains("flash") && !content.contains("Flash") { continue; }
+
+        // Check for repayment verification
+        let has_repayment = content.contains("repay") || content.contains("Repay")
+            || content.contains("repayment") || content.contains("Repayment")
+            || content.contains("return_amount") || content.contains("balance_before")
+            || content.contains("balance_after") || content.contains("pre_balance")
+            || content.contains("post_balance");
+
+        let has_fee_check = content.contains("flash_loan_fee") || content.contains("flash_fee")
+            || content.contains("protocol_fee") || content.contains("borrow_fee");
+
+        if !has_repayment && !has_fee_check {
+            if let Some(line) = find_line_audit(file, "fn.*flash", 3) {
+                let snippet = get_snippet(file, line);
+                out.push(Finding {
+                    id: next_id(),
+                    severity: Severity::Critical,
+                    category: Category::FlashLoan,
+                    title: "Flash loan without repayment verification — free borrow".into(),
+                    file: file.path.clone(),
+                    line: Some(line),
+                    function: String::new(),
+                    snippet,
+                    description: "This program has a flash loan function but does NOT verify that \
+                        borrowed tokens plus fees are returned before the transaction ends. Without \
+                        a balance-before/balance-after check or a repayment instruction, an attacker \
+                        can borrow tokens and never return them. This is the root cause of multiple \
+                        Solana flash loan exploits where the borrowed amount was never verified.".into(),
+                    recommendation: "Implement balance-before/balance-after tracking on the token \
+                        account. Record the pre-flash balance, execute the callback, then verify \
+                        the post-flash balance >= pre-flash balance + fee.".into(),
+                    anchor_fix: "let balance_before = token_account.amount; /* callback */ require!(token_account.amount >= balance_before + fee)".into(),
+                    cwe: "CWE-841".into(),
+                    needs_ai_context: false,
+                    ai_explanation: None,
+                    ai_severity: None,
+                    exploitability: 0,
+                    confirmed_by_taint: vec![],
+                });
+            }
+        }
+    }
+    out
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SHARE PRICE DONATION ATTACK
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+fn detect_share_price_donation(files: &[InputFile], next_id: &mut impl FnMut() -> String) -> Vec<Finding> {
+    let mut out = vec![];
+    for file in files {
+        if !file.path.ends_with(".rs") { continue; }
+        let content = &file.content;
+        let lines: Vec<&str> = content.lines().collect();
+
+        // Only scan vault/lending/pool contracts
+        if !content.contains("vault") && !content.contains("Vault")
+            && !content.contains("pool") && !content.contains("Pool")
+            && !content.contains("lend") && !content.contains("Lend")
+        {
+            continue;
+        }
+
+        // Check if share calculation uses total_supply or total_shares
+        let has_share_calc = content.contains("total_supply") || content.contains("total_shares")
+            || content.contains("total_value") || content.contains("total_assets")
+            || content.contains("share_price") || content.contains("share_value");
+
+        if !has_share_calc { continue; }
+
+        // Look for the share price calculation pattern: shares = amount * total_shares / reserve
+        for (i, line) in lines.iter().enumerate() {
+            let t = line.trim();
+            // Detect shares = amount * total_supply / reserve or similar
+            if (t.contains("shares") || t.contains("share")) && t.contains("total_supply")
+                || t.contains("shares") && t.contains("total_shares")
+                || t.contains("shares") && t.contains("total_value")
+                || t.contains("shares") && t.contains("reserve")
+                || t.contains("shares") && t.contains("liquidity")
+            {
+                // Check if there's a donation guard (total_supply == 0 check, minimum_liquidity)
+                let ctx_start = i.saturating_sub(10);
+                let ctx_end = (i + 15).min(lines.len());
+                let ctx_str = lines[ctx_start..ctx_end].join("\n");
+
+                let has_donation_guard = ctx_str.contains("total_supply == 0") || ctx_str.contains("total_shares == 0")
+                    || ctx_str.contains("is_empty") || ctx_str.contains("minimum_liquidity")
+                    || ctx_str.contains("MINIMUM_LIQUIDITY") || ctx_str.contains("dead_shares")
+                    || ctx_str.contains("lock_shares") || ctx_str.contains("pre_mint")
+                    || ctx_str.contains("initial_shares") || ctx_str.contains("first_deposit");
+
+                if !has_donation_guard {
+                    let snippet = get_snippet(file, i + 1);
+                    out.push(Finding {
+                        id: next_id(),
+                        severity: Severity::Critical,
+                        category: Category::YieldDrain,
+                        title: "Share price donation attack — first depositor can be drained".into(),
+                        file: file.path.clone(),
+                        line: Some(i + 1),
+                        function: String::new(),
+                        snippet,
+                        description: "The share/price calculation does not protect against the \
+                            classic donation attack. A first depositor can mint a tiny number of \
+                            shares, then donate assets directly to inflate the share price. \
+                            Subsequent depositors receive very few shares, allowing the attacker \
+                            to withdraw most of their value. This has been exploited in multiple \
+                            Solana vault protocols.".into(),
+                        recommendation: "Mint a minimum number of dead/locked shares on first deposit \
+                            (e.g., 1000 shares sent to a burn address). Or require a minimum initial \
+                            deposit and lock those shares forever. This is the Uniswap V2 pattern.".into(),
+                        anchor_fix: "if total_shares == 0 { mint(1000, burn_address); }".into(),
+                        cwe: "CWE-682".into(),
+                        needs_ai_context: false,
+                        ai_explanation: None,
+                        ai_severity: None,
+                        exploitability: 0,
+                        confirmed_by_taint: vec![],
+                    });
+                    break;
+                }
+            }
+        }
+    }
+    out
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// STALE ORACLE PRICE
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+fn detect_stale_oracle_price(files: &[InputFile], next_id: &mut impl FnMut() -> String) -> Vec<Finding> {
+    let mut out = vec![];
+    for file in files {
+        if !file.path.ends_with(".rs") { continue; }
+        let content = &file.content;
+        let lines: Vec<&str> = content.lines().collect();
+
+        // Only scan files that use oracle prices
+        if !content.contains("oracle") && !content.contains("price_feed")
+            && !content.contains("pyth") && !content.contains("switchboard")
+        {
+            continue;
+        }
+
+        for (i, line) in lines.iter().enumerate() {
+            let t = line.trim();
+            // Find where oracle price is read
+            if (t.contains("oracle.") || t.contains("price_feed.") || t.contains("pyth."))
+                && (t.contains("price") || t.contains("value"))
+                && !t.contains("//")
+            {
+                let ctx_start = i.saturating_sub(10);
+                let ctx_end = (i + 15).min(lines.len());
+                let ctx_str = lines[ctx_start..ctx_end].join("\n");
+
+                // Check for staleness checks
+                let has_staleness_check = ctx_str.contains("publish_time") || ctx_str.contains("timestamp")
+                    || ctx_str.contains("slot") || ctx_str.contains("confidence")
+                    || ctx_str.contains("staleness") || ctx_str.contains("max_age")
+                    || ctx_str.contains("valid_time") || ctx_str.contains("expir")
+                    || ctx_str.contains("require!(.*publish_time") || ctx_str.contains("require!(.*slot")
+                    || ctx_str.contains("current_time") || ctx_str.contains("clock");
+
+                if !has_staleness_check {
+                    let snippet = get_snippet(file, i + 1);
+                    out.push(Finding {
+                        id: next_id(),
+                        severity: Severity::High,
+                        category: Category::PriceOracle,
+                        title: "Oracle price used without staleness check — stale price risk".into(),
+                        file: file.path.clone(),
+                        line: Some(i + 1),
+                        function: String::new(),
+                        snippet,
+                        description: "An oracle price is read but its timestamp or slot is not \
+                            verified for freshness. If the oracle feed becomes stale (e.g., due to \
+                            network issues, low liquidity, or a paused market), the program will \
+                            use an outdated price. This allows arbitrage against stale prices, \
+                            causing incorrect liquidations, borrows, or swaps.".into(),
+                        recommendation: "Always verify the oracle price is fresh: check \
+                            `price.publish_time >= Clock::get()?.unix_timestamp - MAX_AGE_SECONDS` \
+                            and verify `price.confidence_interval` is within acceptable range.".into(),
+                        anchor_fix: "require!(price.publish_time >= Clock::get()?.unix_timestamp - 60, StalePrice)".into(),
+                        cwe: "CWE-682".into(),
+                        needs_ai_context: false,
+                        ai_explanation: None,
+                        ai_severity: None,
+                        exploitability: 0,
+                        confirmed_by_taint: vec![],
+                    });
+                    break;
+                }
+            }
+        }
+    }
+    out
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// TIMESTAMP DEPENDENCE
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+fn detect_timestamp_dependence(files: &[InputFile], next_id: &mut impl FnMut() -> String) -> Vec<Finding> {
+    let mut out = vec![];
+    for file in files {
+        if !file.path.ends_with(".rs") { continue; }
+        let content = &file.content;
+        let lines: Vec<&str> = content.lines().collect();
+
+        // Only scan files that use Clock or timestamps
+        if !content.contains("Clock") && !content.contains("unix_timestamp")
+            && !content.contains("timestamp")
+        {
+            continue;
+        }
+
+        for (i, line) in lines.iter().enumerate() {
+            let t = line.trim();
+            // Find timestamp usage in decision logic
+            if (t.contains("unix_timestamp") || t.contains("clock().timestamp"))
+                && (t.contains("if ") || t.contains("require!") || t.contains(">") || t.contains("<")
+                    || t.contains("==") || t.contains("!="))
+                && !t.contains("//")
+            {
+                let ctx_start = i.saturating_sub(5);
+                let ctx_end = (i + 15).min(lines.len());
+                let ctx_str = lines[ctx_start..ctx_end].join("\n");
+
+                // Check if it's used for deadline/round boundaries (acceptable) or precise timing (bad)
+                let is_deadline = ctx_str.contains("deadline") || ctx_str.contains("expir")
+                    || ctx_str.contains("maturity") || ctx_str.contains("vest")
+                    || ctx_str.contains("cliff") || ctx_str.contains("cutoff");
+
+                if !is_deadline {
+                    let snippet = get_snippet(file, i + 1);
+                    out.push(Finding {
+                        id: next_id(),
+                        severity: Severity::Medium,
+                        category: Category::SysvarUsage,
+                        title: "Timestamp-based decision logic — validator manipulation risk".into(),
+                        file: file.path.clone(),
+                        line: Some(i + 1),
+                        function: String::new(),
+                        snippet,
+                        description: "The program uses `unix_timestamp` in a decision/branch. \
+                            On Solana, block timestamps are set by validators and can vary by up to \
+                            a few seconds. If precise timing (~second-level) is required for financial \
+                            decisions (vesting, auctions, liquidations), a malicious validator can \
+                            manipulate the timestamp by a small amount for profit.".into(),
+                        recommendation: "For financial decisions, use slot numbers (which are precise) \
+                            instead of timestamps. If timestamps are required, accept a tolerance of \
+                            several seconds. For auctions, use slot-based deadlines.".into(),
+                        anchor_fix: "Use `Clock::get()?.slot` for precise ordering instead of timestamps".into(),
+                        cwe: "CWE-829".into(),
+                        needs_ai_context: false,
+                        ai_explanation: None,
+                        ai_severity: None,
+                        exploitability: 0,
+                        confirmed_by_taint: vec![],
+                    });
+                    break;
+                }
+            }
+        }
+    }
+    out
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════════════
 
 fn find_line(file: &InputFile, pattern: &str, _ctx: usize) -> Option<usize> {
     for (i, line) in file.content.lines().enumerate() {
         if line.contains(pattern) {
+            return Some(i + 1);
+        }
+    }
+    None
+}
+
+fn find_line_audit(file: &InputFile, pattern: &str, _ctx: usize) -> Option<usize> {
+    for (i, line) in file.content.lines().enumerate() {
+        if line.contains(pattern.trim_matches('/')) || {
+            // Try pattern as regex-like prefix
+            let clean = pattern.trim_start_matches("fn.*");
+            line.contains(clean)
+        } {
+            return Some(i + 1);
+        }
+    }
+    // Fallback: search for "fn flash" or whatever function name
+    let simple = pattern.trim_start_matches("fn.*").trim_start_matches("fn ");
+    for (i, line) in file.content.lines().enumerate() {
+        if line.contains(simple) {
             return Some(i + 1);
         }
     }
