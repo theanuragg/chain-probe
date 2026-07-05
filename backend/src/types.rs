@@ -12,6 +12,8 @@ pub struct AnalyzeRequest {
     pub files: Vec<InputFile>,
     #[serde(default)]
     pub llm_consent: bool,
+    #[serde(default)]
+    pub cu_budgets: Option<HashMap<String, u64>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -476,6 +478,64 @@ pub struct ArithmeticOp {
     pub uses_checked: bool,
 }
 
+//   Performance                               ─
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum PerfCategory {
+    UnboundedLoop,
+    CpiInLoop,
+    ExcessiveRealloc,
+    LargeDeserialization,
+    RedundantAccountRead,
+    NoComputeBudget,
+    InefficientDataStructure,
+    DeepCpiChain,
+    AnchorPaddingWaste,
+    LargeCpiSerialization,
+}
+
+impl PerfCategory {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            PerfCategory::UnboundedLoop => "Unbounded loop over accounts",
+            PerfCategory::CpiInLoop => "CPI call inside loop",
+            PerfCategory::ExcessiveRealloc => "Excessive realloc",
+            PerfCategory::LargeDeserialization => "Large account deserialization",
+            PerfCategory::RedundantAccountRead => "Redundant account read",
+            PerfCategory::NoComputeBudget => "No compute budget set",
+            PerfCategory::InefficientDataStructure => "Inefficient data structure",
+            PerfCategory::DeepCpiChain => "Deep CPI chain",
+            PerfCategory::AnchorPaddingWaste => "Anchor padding waste",
+            PerfCategory::LargeCpiSerialization => "Large CPI serialization",
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PerfIssue {
+    pub id: String,
+    pub severity: Severity,
+    pub category: PerfCategory,
+    pub title: String,
+    pub description: String,
+    pub recommendation: String,
+    pub file: String,
+    pub line: Option<usize>,
+    pub function: String,
+    pub cu_impact: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct InstructionCuEstimate {
+    pub name: String,
+    pub total_cu: u64,
+    pub cpi_cu: u64,
+    pub compute_cu: u64,
+    pub account_cu: u64,
+    pub budget: u64,
+    pub budget_pct: f64,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ProgramProfile {
     pub program_name: String,
@@ -504,6 +564,9 @@ pub struct ProgramProfile {
     pub framework_patterns: Vec<String>,
     pub module_tree: Vec<String>,
     pub dependency_count: usize,
+    pub per_instruction_cu: Vec<InstructionCuEstimate>,
+    pub performance_score: u32,
+    pub top_cu_consumers: Vec<String>,
 }
 
 //   Summary                                  ─
@@ -725,4 +788,6 @@ pub struct AnalysisReport {
     // v4 new features
     pub token_flow: TokenFlowGraph,
     pub permission_matrix: PermissionMatrix,
+    // v4.2 performance
+    pub performance_issues: Vec<PerfIssue>,
 }

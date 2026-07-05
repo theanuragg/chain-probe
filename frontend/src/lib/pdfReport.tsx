@@ -536,6 +536,69 @@ const SystemOverviewSection = ({ report }: { report: AnalysisReport }) => (
   </View>
 );
 
+const PerformanceSection = ({ report }: { report: AnalysisReport }) => (
+  <View wrap={false}>
+    <Text style={styles.sectionHeading}>Performance & Compute</Text>
+    <View style={styles.scoreRow}>
+      <View style={styles.scoreBox}>
+        <Text style={styles.scoreLabel}>Performance Score</Text>
+        <Text style={[styles.scoreValue, { color: report.profile.performance_score >= 70 ? '#00D98A' : report.profile.performance_score >= 40 ? '#FFAA33' : '#FF3D5C' }]}>
+          {report.profile.performance_score}/100
+        </Text>
+        <View style={styles.scoreBar}>
+          <View style={[styles.scoreFill, { width: `${report.profile.performance_score}%`, backgroundColor: report.profile.performance_score >= 70 ? '#00D98A' : report.profile.performance_score >= 40 ? '#FFAA33' : '#FF3D5C' }]} />
+        </View>
+      </View>
+      <View style={styles.scoreBox}>
+        <Text style={styles.scoreLabel}>Estimated CU</Text>
+        <Text style={[styles.scoreValue, { color: '#FF8717' }]}>
+          {report.profile.estimated_compute_units.toLocaleString()}
+        </Text>
+        <Text style={{ fontSize: 8, color: '#888', marginTop: 4 }}>total across all instructions</Text>
+      </View>
+    </View>
+    {report.profile.per_instruction_cu && report.profile.per_instruction_cu.length > 0 && (
+      <>
+        <Text style={styles.subHeading2}>Per-Instruction CU Breakdown</Text>
+        {report.profile.per_instruction_cu.map((est, i) => (
+          <View key={i} style={styles.kvRow}>
+            <Text style={[styles.kvLabel, { fontFamily: 'Courier', fontSize: 9 }]}>{est.name}</Text>
+            <Text style={[styles.kvValue, { fontSize: 9, color: '#888' }]}>
+              {est.total_cu.toLocaleString()} CU · CPI {est.cpi_cu} · Compute {est.compute_cu} · Acct {est.account_cu}
+            </Text>
+          </View>
+        ))}
+      </>
+    )}
+    {report.profile.top_cu_consumers && report.profile.top_cu_consumers.length > 0 && (
+      <>
+        <Text style={styles.subHeading2}>Top CU Consumers</Text>
+        {report.profile.top_cu_consumers.map((c, i) => (
+          <Text key={i} style={[styles.bodyText, { fontSize: 9, marginBottom: 2 }]}>• {c}</Text>
+        ))}
+      </>
+    )}
+    {report.performance_issues && report.performance_issues.length > 0 && (
+      <>
+        <Text style={styles.subHeading2}>Performance Findings ({report.performance_issues.length})</Text>
+        {report.performance_issues.map((p, i) => (
+          <View key={i} style={{ marginBottom: 6 }}>
+            <Text style={[styles.bodyText, { fontWeight: 'bold', fontSize: 9 }]}>
+              [{p.severity}] {p.title}
+            </Text>
+            <Text style={[styles.bodyText, { fontSize: 8, color: '#666', marginTop: 2 }]}>
+              {p.description.substring(0, 200)}
+            </Text>
+            <Text style={[styles.bodyText, { fontSize: 8, color: '#556ADC', marginTop: 2 }]}>
+              ~{p.cu_impact.toLocaleString()} CU · {p.file}{p.line ? `:${p.line}` : ''}
+            </Text>
+          </View>
+        ))}
+      </>
+    )}
+  </View>
+);
+
 const SecurityPostureSection = ({ report }: { report: AnalysisReport }) => (
   <View wrap={false}>
     <Text style={styles.sectionHeading}>Security Posture</Text>
@@ -855,6 +918,8 @@ export const PdfReport = ({ report }: PdfReportProps) => (
       <ReportHeader report={report} />
       <ReportFooter />
       <SecurityPostureSection report={report} />
+      <View style={styles.spacer16} />
+      <PerformanceSection report={report} />
       <View style={styles.spacer16} />
       <TechnicalOverviewSection report={report} />
     </Page>

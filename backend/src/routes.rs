@@ -9,6 +9,7 @@ use crate::{
     ast_visitor::ProjectVisitor,
     diff::diff_reports as compute_diff,
     patterns,
+    perf,
     profiler::compute_profile,
     report::{apply_ai_enrichment, build_report},
     types::{AnalysisReport, AnalyzeRequest},
@@ -136,9 +137,18 @@ pub async fn analyze(
         let profile = compute_profile(&visitor, &req.files);
         info!("Profile: complexity={}, anchor={}", profile.complexity, profile.anchor_version);
 
+        //   Stage 3b: Performance analysis
+        let perf_issues = perf::detect_perf_issues(&visitor, &req.files, &req.cu_budgets);
+        if !perf_issues.is_empty() {
+            info!("Perf: {} performance issues found", perf_issues.len());
+        }
+
         //   Stages 4–10: trust, taint, invariants, data_flow, call_graph,
         //                 chains, scoring, vuln_db — all inside build_report    
         let (mut report, ai_context) = build_report(findings, profile, &visitor, &req.files);
+
+        // Attach performance issues to report
+        report.performance_issues = perf_issues;
 
         info!(
             "Report: {} findings, {} chains, {} taint_flows, {} invariants ({} bypassable), {} token_anomalies, {} broken_perms, score={}",

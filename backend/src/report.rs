@@ -187,6 +187,7 @@ pub fn build_report(
         call_graph,
         token_flow,
         permission_matrix,
+        performance_issues: vec![],
     };
 
     //   Extract AI context                           

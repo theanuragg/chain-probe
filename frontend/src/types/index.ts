@@ -224,6 +224,50 @@ export interface KnownVuln {
   url: string;
 }
 
+//   Performance                               ─
+
+export type PerfCategory =
+  | 'unbounded_loop' | 'cpi_in_loop' | 'excessive_realloc'
+  | 'large_deserialization' | 'redundant_account_read' | 'no_compute_budget'
+  | 'inefficient_data_structure' | 'deep_cpi_chain'
+  | 'anchor_padding_waste' | 'large_cpi_serialization';
+
+export const PERF_CATEGORY_LABELS: Record<PerfCategory, string> = {
+  unbounded_loop: 'Unbounded Loop',
+  cpi_in_loop: 'CPI in Loop',
+  excessive_realloc: 'Excessive Realloc',
+  large_deserialization: 'Large Deserialization',
+  redundant_account_read: 'Redundant Read',
+  no_compute_budget: 'No Compute Budget',
+  inefficient_data_structure: 'Inefficient Data Structure',
+  deep_cpi_chain: 'Deep CPI Chain',
+  anchor_padding_waste: 'Padding Waste',
+  large_cpi_serialization: 'Large CPI Serialization',
+};
+
+export interface PerfIssue {
+  id: string;
+  severity: Severity;
+  category: PerfCategory;
+  title: string;
+  description: string;
+  recommendation: string;
+  file: string;
+  line: number | null;
+  function: string;
+  cu_impact: number;
+}
+
+export interface InstructionCuEstimate {
+  name: string;
+  total_cu: number;
+  cpi_cu: number;
+  compute_cu: number;
+  account_cu: number;
+  budget: number;
+  budget_pct: number;
+}
+
 //   Profile                                  ─
 
 export interface InstructionInfo {
@@ -262,6 +306,9 @@ export interface ProgramProfile {
   overflow_checks_enabled: boolean;
   framework_patterns: string[];
   module_tree: string[];
+  per_instruction_cu: InstructionCuEstimate[];
+  performance_score: number;
+  top_cu_consumers: string[];
 }
 
 //   Summary                                  ─
@@ -450,6 +497,7 @@ export interface AnalysisReport {
   call_graph: CallGraph;
   token_flow: TokenFlowGraph;
   permission_matrix: PermissionMatrix;
+  performance_issues: PerfIssue[];
 }
 
 //   Input file utils                              

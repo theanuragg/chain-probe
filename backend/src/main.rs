@@ -35,6 +35,7 @@ mod pinocchio;
 mod sarif;
 mod fuzz;
 mod monitor;
+mod perf;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

@@ -13,10 +13,11 @@ import { SurfaceTab } from '@/components/tabs/SurfaceTab';
 import { ChainsTab } from '@/components/tabs/ChainsTab';
 import { FindingsTab } from '@/components/tabs/FindingsTab';
 import { AdvisoriesTab } from '@/components/tabs/AdvisoriesTab';
+import { ProfilerTab } from '@/components/tabs/ProfilerTab';
 import { AnalysisReport, FRAMEWORK_BADGE } from '@/types';
 import { CicdWizard } from '@/components/CicdWizard';
 
-type ReportTab = 'overview' | 'taint' | 'invariants' | 'tokens' | 'permissions' | 'surface' | 'chains' | 'findings' | 'advisories';
+type ReportTab = 'overview' | 'profiler' | 'taint' | 'invariants' | 'tokens' | 'permissions' | 'surface' | 'chains' | 'findings' | 'advisories';
 
 export default function ReportPage() {
   const router = useRouter();
@@ -55,6 +56,7 @@ export default function ReportPage() {
 
   const TABS: {key:ReportTab;label:string;badge?:number;warn?:boolean}[] = [
     {key:'overview',label:'Overview'},
+    {key:'profiler',label:'Profiler',badge:report.performance_issues?.length,warn:report.performance_issues?.some(p=>p.severity==='CRITICAL'||p.severity==='HIGH')},
     {key:'taint',label:'Taint',badge:report.taint_flows.length,warn:report.taint_flows.some(f=>f.severity==='CRITICAL')},
     {key:'invariants',label:'Invariants',badge:report.summary.bypassable_invariant_count,warn:report.summary.bypassable_invariant_count>0},
     {key:'tokens',label:'Token Flow',badge:report.token_flow?.anomalies?.length,warn:(report.token_flow?.anomalies?.length??0)>0},
@@ -156,6 +158,7 @@ export default function ReportPage() {
       }
       <div style={{maxWidth:1440,margin:'0 auto',padding:'32px 24px 60px'}}>
         {tab==='overview'     && <OverviewTab report={report}/>}
+        {tab==='profiler'     && <ProfilerTab report={report}/>}
         {tab==='taint'        && <TaintTab report={report}/>}
         {tab==='invariants'   && <InvariantsTab report={report}/>}
         {tab==='tokens'       && <TokenFlowTab report={report}/>}

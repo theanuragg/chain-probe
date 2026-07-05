@@ -93,6 +93,8 @@ export function OverviewTab({report}:{report:AnalysisReport}) {
             {l:'Bypassable Invariants',v:report.summary.bypassable_invariant_count,col:report.summary.bypassable_invariant_count>0?C.red:C.grn},
             {l:'PDA Derivations',v:report.profile.pda_count,col:C.pur},
             {l:'Invariants Total',v:report.summary.invariant_count,col:C.t2},
+            {l:'Est. CU',v:report.profile.estimated_compute_units?`${(report.profile.estimated_compute_units/1000).toFixed(0)}K`:'N/A',col:'#FF8717'},
+            {l:'Performance',v:`${report.profile.performance_score??'?'}/100`,col:C.cyan},
           ].map(c=>(
             <div key={c.l} style={{background:'#fff',border:`1px solid ${C.bdr}`,borderRadius:16,padding:18}}>
               <div style={{fontSize:11,color:C.t3,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4,fontWeight:600}}>{c.l}</div>

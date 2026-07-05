@@ -28,6 +28,7 @@ pub mod pinocchio;
 pub mod sarif;
 pub mod fuzz;
 pub mod monitor;
+pub mod perf;
 
 // Re-export the top-level entry points the CLI needs
 pub use report::build_report;
